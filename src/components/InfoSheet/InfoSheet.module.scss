@@ -1,0 +1,38 @@
+.title {
+  composes: h2 from '../Sheet/Sheet.module.scss';
+}
+
+.sub {
+  composes: sub from '../Sheet/Sheet.module.scss';
+}
+
+.solid {
+  composes: solid from '../../styles/shared.module.scss';
+}
+
+.guide {
+  font-size: 15.5px;
+  line-height: 1.62;
+  color: var(--ink);
+  margin-bottom: 14px;
+}
+
+.cue {
+  background: var(--panel);
+  border-left: 2px solid var(--huefte);
+  border-radius: 0 10px 10px 0;
+  padding: 12px 14px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--mute);
+}
+
+.cuelabel {
+  display: block;
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--huefte);
+  margin-bottom: 5px;
+  font-weight: 600;
+}

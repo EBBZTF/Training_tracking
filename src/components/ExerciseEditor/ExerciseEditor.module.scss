@@ -1,0 +1,76 @@
+.edit {
+  border: 1px dashed var(--line);
+  border-radius: 12px;
+  padding: 12px;
+  margin-bottom: 8px;
+  background: var(--panel);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  margin-top: 9px;
+}
+
+.f {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+
+  label {
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--faint);
+  }
+
+  input,
+  select,
+  textarea {
+    background: var(--panel2);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 9px 10px;
+    font-size: 15px;
+    width: 100%;
+  }
+
+  textarea {
+    resize: vertical;
+    line-height: 1.5;
+    font-size: 14px;
+  }
+
+  &.wide {
+    grid-column: 1 / -1;
+  }
+}
+
+.setsRow {
+  display: flex;
+  gap: 6px;
+}
+
+.erow {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.mini {
+  font-size: 12.5px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  color: var(--mute);
+
+  &.danger {
+    color: var(--kraft);
+    border-color: #4a2a28;
+  }
+}
+
+.spacer {
+  margin-left: auto;
+}

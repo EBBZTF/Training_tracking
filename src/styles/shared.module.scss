@@ -1,0 +1,28 @@
+.solid {
+  width: 100%;
+  padding: 15px;
+  border-radius: 11px;
+  background: var(--ink);
+  color: var(--bg);
+  font-weight: 650;
+  font-size: 16px;
+  margin-top: 14px;
+}
+
+.ghost {
+  width: 100%;
+  padding: 13px;
+  color: var(--mute);
+  font-size: 14px;
+  margin-top: 8px;
+}
+
+.addbtn {
+  width: 100%;
+  padding: 12px;
+  border: 1px dashed var(--line);
+  border-radius: 10px;
+  color: var(--mute);
+  font-size: 13.5px;
+  margin-top: 2px;
+}

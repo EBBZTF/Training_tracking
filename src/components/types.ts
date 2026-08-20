@@ -1,0 +1,23 @@
+import type { BlockRef, ExerciseType, Side } from '../types';
+
+export interface ExerciseActions {
+  addExercise: (ref: BlockRef) => void;
+  deleteExercise: (ref: BlockRef, exId: string) => void;
+  moveExercise: (ref: BlockRef, exId: string, dir: -1 | 1) => void;
+  setUni: (ref: BlockRef, exId: string, uni: boolean) => void;
+  setType: (ref: BlockRef, exId: string, type: ExerciseType) => void;
+  setText: (
+    ref: BlockRef,
+    exId: string,
+    field: 'name' | 'reps' | 'note' | 'desc',
+    value: string,
+  ) => void;
+  setSets: (ref: BlockRef, exId: string, field: 'sets' | 'setsL' | 'setsR', value: number) => void;
+}
+
+export type SheetState =
+  | { type: 'info'; exId: string }
+  | { type: 'entry'; exId: string; side: Side; index: number; name: string; exType: ExerciseType }
+  | { type: 'history' }
+  | { type: 'data' }
+  | null;

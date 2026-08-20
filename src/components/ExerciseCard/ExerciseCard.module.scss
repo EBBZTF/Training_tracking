@@ -1,0 +1,64 @@
+.ex {
+  background: var(--panel);
+  border-radius: 12px;
+  padding: 13px 14px 14px;
+  margin-bottom: 8px;
+}
+
+.etop {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+
+  > div:first-child {
+    flex: 1;
+    min-width: 0;
+  }
+}
+
+.info {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  color: var(--mute);
+  font-family: Georgia, serif;
+  font-style: italic;
+  font-size: 15px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: -1px;
+
+  &:active {
+    background: var(--panel2);
+    color: var(--ink);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--skill);
+    outline-offset: 2px;
+  }
+}
+
+.ename {
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.espec {
+  font-family: var(--num);
+  font-size: 12px;
+  color: var(--mute);
+  margin-top: 3px;
+}
+
+.enote {
+  font-size: 12.5px;
+  color: var(--faint);
+  margin-top: 6px;
+  line-height: 1.45;
+}

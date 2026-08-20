@@ -1,0 +1,7 @@
+.block {
+  margin: 22px 16px 0;
+}
+
+.addbtn {
+  composes: addbtn from '../../styles/shared.module.scss';
+}

@@ -1,0 +1,20 @@
+.title {
+  composes: h2 from '../Sheet/Sheet.module.scss';
+}
+
+.sub {
+  composes: sub from '../Sheet/Sheet.module.scss';
+}
+
+.solid {
+  composes: solid from '../../styles/shared.module.scss';
+}
+
+.ghost {
+  composes: ghost from '../../styles/shared.module.scss';
+}
+
+.reset {
+  composes: ghost from '../../styles/shared.module.scss';
+  color: var(--kraft);
+}

@@ -1,30 +1,16 @@
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="theme-color" content="#17171A">
-<link rel="manifest" href="manifest.json">
-<link rel="apple-touch-icon" href="icon-180.png">
-<link rel="stylesheet" href="style.css">
-<title>Training</title>
-
-<header>
-  <div class="hrow">
-    <div class="eyebrow">Training</div>
-    <div class="datewrap"><input type="date" id="date"></div>
-  </div>
-  <div class="tabs" id="tabs"></div>
-</header>
-
-<main id="main"></main>
-
-<footer>
-  <button id="nLog" class="on"><span class="ico">◉</span>Protokoll</button>
-  <button id="nEdit"><span class="ico">◎</span>Plan</button>
-  <button id="nHist"><span class="ico">◈</span>Verlauf</button>
-  <button id="nData"><span class="ico">◇</span>Daten</button>
-</footer>
-
-<div class="sheet hide" id="sheet"><div class="card" id="card"></div></div>
-<div class="toast" id="toast"></div>
-
-<script src="app.js"></script>
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="theme-color" content="#17171A" />
+    <link rel="apple-touch-icon" href="./icon-180.png" />
+    <title>Training</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

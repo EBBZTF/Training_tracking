@@ -1,0 +1,42 @@
+.tabs {
+  display: flex;
+  gap: 4px;
+  margin-top: 12px;
+  overflow-x: auto;
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+.tab {
+  flex: 1;
+  min-width: 76px;
+  padding: 10px 8px 12px;
+  border-bottom: 2px solid transparent;
+  text-align: center;
+  color: var(--faint);
+  transition: color 0.15s;
+
+  b {
+    display: block;
+    font-size: 17px;
+    font-weight: 650;
+    letter-spacing: 0.02em;
+  }
+
+  span {
+    display: block;
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-top: 2px;
+    opacity: 0.85;
+  }
+
+  &.on {
+    color: var(--ink);
+    border-bottom-color: var(--ink);
+  }
+}

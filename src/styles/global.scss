@@ -1,0 +1,58 @@
+:root {
+  --bg: #17171a;
+  --panel: #202026;
+  --panel2: #26262e;
+  --line: #32323c;
+  --ink: #edebe6;
+  --mute: #8a8a94;
+  --faint: #5a5a66;
+  --huefte: #f2c14e;
+  --skill: #5b9bc9;
+  --kraft: #c6493e;
+  --explosiv: #4e9e6a;
+  --core: #8a8a94;
+  --ausdauer: #c08040;
+  --num: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  --ui: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--ui);
+}
+
+body {
+  padding: 0 0 96px;
+  font-size: 16px;
+  line-height: 1.4;
+}
+
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+}
+
+button {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+  }
+}

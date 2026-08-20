@@ -1,0 +1,44 @@
+.title {
+  composes: h2 from '../Sheet/Sheet.module.scss';
+}
+
+.sub {
+  composes: sub from '../Sheet/Sheet.module.scss';
+}
+
+.solid {
+  composes: solid from '../../styles/shared.module.scss';
+}
+
+.ghost {
+  composes: ghost from '../../styles/shared.module.scss';
+}
+
+.big {
+  width: 100%;
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  padding: 15px;
+  font-family: var(--num);
+  font-size: 26px;
+  text-align: center;
+  font-weight: 600;
+}
+
+.quick {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 11px;
+
+  button {
+    padding: 9px 13px;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    font-family: var(--num);
+    font-size: 14px;
+    color: var(--mute);
+  }
+}
