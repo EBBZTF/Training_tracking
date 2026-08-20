@@ -2,19 +2,7 @@
 
 Persönliche Trainings-App. Läuft als PWA auf dem iPhone, ohne App Store und ohne Apple-Developer-Konto. Die App selbst installiert sich offline, braucht zum Laden und Speichern der Daten aber eine Verbindung zum Backend — siehe zuerst [`docs/BACKEND.md`](BACKEND.md).
 
-**Dateien in diesem Ordner:**
-
-| Datei | Zweck |
-|---|---|
-| `index.html` | Markup |
-| `style.css` | Gestaltung |
-| `app.js` | Logik und Plandaten |
-| `manifest.json` | Macht sie installierbar (Name, Icon, Vollbild) |
-| `sw.js` | Service Worker für den Offline-Betrieb |
-| `icon-180/192/512.png` | Icons für Home-Bildschirm und App-Umschalter |
-| `icon-512-maskable.png` | Icon-Variante für Android |
-
-Alle Dateien kommen **flach ins Repo-Wurzelverzeichnis**, ohne Unterordner. Die Pfade in `manifest.json` und `sw.js` gehen davon aus.
+Das Frontend ist eine React/TypeScript-App (siehe [`README.md`](../README.md) für den Aufbau der Ordner) und wird mit einem Build-Schritt aus dem Quellcode erzeugt. Diesen Build übernimmt GitHub Actions automatisch bei jedem Push nach `main` — du musst nichts lokal bauen, nur den Code committen.
 
 ---
 
@@ -32,15 +20,20 @@ GitHub Pages funktioniert im kostenlosen Tarif nur mit öffentlichen Repositorie
 
 Das ist hier unkritisch: Öffentlich ist nur der Programmcode. **Deine Trainingsdaten landen nie im Repo** — sie liegen ausschliesslich in der Postgres-Datenbank hinter deinem Backend, das du selbst hostest. Wer die URL der App kennt, aber nicht die Adresse deines Backends, sieht nur eine leere Hülle.
 
-Was du beachten solltest: Trägst du später persönliche Notizen direkt in `index.html` ein (etwa Befunde deiner Physio in den Anleitungstexten), stünden die öffentlich. Solche Dinge gehören in die App selbst über "Plan bearbeiten", nicht in den Quelltext.
+Was du beachten solltest: Trägst du später persönliche Notizen direkt in den Quellcode ein (etwa Befunde deiner Physio in den Anleitungstexten unter `src/data/`), stünden die öffentlich. Solche Dinge gehören in die App selbst über "Plan bearbeiten", nicht in den Quelltext.
 
 ---
 
-## Schritt 2 — Dateien hochladen
+## Schritt 2 — Code hochladen
 
-Im leeren Repository auf **uploading an existing file** klicken (oder **Add file** → **Upload files**).
+Am einfachsten mit Git:
 
-Alle Dateien aus diesem Ordner **gleichzeitig** ins Feld ziehen. Unten **Commit changes**.
+```bash
+git remote add origin https://github.com/DEINNAME/training.git
+git push -u origin main
+```
+
+Ohne Git geht es auch über die GitHub-Weboberfläche (**Add file** → **Upload files**, den ganzen Projektordner reinziehen) — dabei **`node_modules/` und `dist/` weglassen**, die werden beim Bau automatisch erzeugt und gehören nicht ins Repo.
 
 ---
 
@@ -48,10 +41,9 @@ Alle Dateien aus diesem Ordner **gleichzeitig** ins Feld ziehen. Unten **Commit 
 
 1. Im Repository auf **Settings** (oben rechts im Repo-Menü, nicht das Konto-Menü)
 2. Links in der Seitenleiste auf **Pages**
-3. Unter *Build and deployment* → *Source*: **Deploy from a branch**
-4. *Branch*: **main**, Ordner **/ (root)** → **Save**
+3. Unter *Build and deployment* → *Source*: **GitHub Actions** (nicht "Deploy from a branch" — der Build läuft über den mitgelieferten Workflow unter `.github/workflows/deploy.yml`)
 
-Nach ein bis zwei Minuten steht oben auf derselben Seite deine Adresse:
+Nach dem nächsten Push nach `main` baut GitHub Actions die App automatisch (Reiter **Actions** im Repo zeigt den Fortschritt). Ist der Lauf grün, steht oben auf der Pages-Einstellungsseite deine Adresse:
 
 ```
 https://DEINNAME.github.io/training/
@@ -80,13 +72,11 @@ Kleine Korrekturen — Übungen, Sätze, Notizen — machst du direkt in der App
 
 Am Code selbst änderst du so:
 
-1. Im Repo auf die betroffene Datei (`index.html` für Markup, `style.css` für Gestaltung, `app.js` für Logik/Plandaten) → Stift-Symbol oben rechts
-2. Ändern → **Commit changes**
-3. **In `sw.js` die Zahl bei `VERSION` um eins erhöhen** und ebenfalls committen
+1. Im Repo auf die betroffene Datei (z. B. eine Datei unter `src/components/` oder `src/data/`) → Stift-Symbol oben rechts, oder lokal klonen und in einem Editor öffnen
+2. Ändern → **Commit changes** (bzw. `git push`)
+3. Im Reiter **Actions** den Build-Lauf abwarten (dauert selten länger als eine Minute)
 
-Der dritte Schritt ist der, den man vergisst. Ohne ihn zeigt dein iPhone hartnäckig die alte zwischengespeicherte Fassung, und du suchst den Fehler im falschen Code.
-
-Danach die App schliessen (im App-Umschalter nach oben wischen) und neu öffnen.
+Ein manueller Cache-Versionsschritt wie früher entfällt — der Service Worker aktualisiert sich beim nächsten Start der App automatisch, sobald ein neuer Build online ist. Einmal die App schliessen (im App-Umschalter nach oben wischen) und neu öffnen reicht.
 
 ---
 
@@ -103,13 +93,13 @@ Es lohnt sich, den JSON-Export/Import gleich beim ersten Öffnen einmal durchzus
 ## Wenn etwas nicht geht
 
 **Seite bleibt weiss oder zeigt 404**
-Pages braucht ein bis zwei Minuten. Prüfe unter Settings → Pages, ob Branch `main` und Ordner `/ (root)` eingestellt sind, und ob `index.html` wirklich im Wurzelverzeichnis liegt und nicht in einem Unterordner.
+Prüfe zuerst den Reiter **Actions** — ist der letzte Lauf rot, ist der Build fehlgeschlagen und es wurde nichts deployt. Ist er grün, unter Settings → Pages prüfen, ob *Source* auf **GitHub Actions** steht.
 
 **Kein Icon, kein Vollbild**
-`manifest.json` und die PNGs müssen neben `index.html` liegen. Prüfen kannst du das, indem du `https://DEINNAME.github.io/training/manifest.json` direkt aufrufst — kommt eine 404, liegt die Datei falsch.
+Die Icons müssen in `public/` liegen (siehe README-Layout). Prüfen kannst du das, indem du `https://DEINNAME.github.io/training/manifest.webmanifest` direkt aufrufst — kommt eine 404, liegt etwas falsch oder der Build ist fehlgeschlagen.
 
 **Änderungen erscheinen nicht**
-`VERSION` in `sw.js` erhöht? App vollständig geschlossen und neu geöffnet?
+Ist der Actions-Lauf für deinen Commit durch und grün? App vollständig geschlossen und neu geöffnet?
 
 **Nach einem Update stehen noch die alten Trainingstage in der App**
 Der Plan wird beim ersten Start gespeichert und danach nicht mehr überschrieben — sonst würden deine eigenen Änderungen verloren gehen. Nach einem Struktur-Update einmal **Daten** → **Plan auf Ausgangsversion zurücksetzen**. Protokollierte Einheiten bleiben dabei erhalten.
