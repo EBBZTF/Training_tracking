@@ -1,6 +1,6 @@
 # Training — Einrichtung
 
-Persönliche Trainings-App. Läuft als PWA auf dem iPhone, offline, ohne App Store und ohne Apple-Developer-Konto.
+Persönliche Trainings-App. Läuft als PWA auf dem iPhone, ohne App Store und ohne Apple-Developer-Konto. Die App selbst installiert sich offline, braucht zum Laden und Speichern der Daten aber eine Verbindung zum Backend — siehe zuerst [`docs/BACKEND.md`](BACKEND.md).
 
 **Dateien in diesem Ordner:**
 
@@ -30,7 +30,7 @@ Alle Dateien kommen **flach ins Repo-Wurzelverzeichnis**, ohne Unterordner. Die 
 
 GitHub Pages funktioniert im kostenlosen Tarif nur mit öffentlichen Repositories. Für private Repos brauchst du GitHub Pro.
 
-Das ist hier unkritisch: Öffentlich ist nur der Programmcode. **Deine Trainingsdaten landen nie im Repo** — sie liegen ausschliesslich im Speicher deines iPhones. Wer die URL kennt, sieht eine leere App, nicht deine Werte.
+Das ist hier unkritisch: Öffentlich ist nur der Programmcode. **Deine Trainingsdaten landen nie im Repo** — sie liegen ausschliesslich in der Postgres-Datenbank hinter deinem Backend, das du selbst hostest. Wer die URL der App kennt, aber nicht die Adresse deines Backends, sieht nur eine leere Hülle.
 
 Was du beachten solltest: Trägst du später persönliche Notizen direkt in `index.html` ein (etwa Befunde deiner Physio in den Anleitungstexten), stünden die öffentlich. Solche Dinge gehören in die App selbst über "Plan bearbeiten", nicht in den Quelltext.
 
@@ -70,7 +70,7 @@ Lädt sie noch nicht, warte kurz und aktualisiere. Der erste Aufbau dauert manch
 
 Ab jetzt startest du sie über das Icon. Sie öffnet im Vollbild, ohne Safari-Leiste, und funktioniert offline.
 
-**Wichtig:** Benutze ab jetzt nur noch das Icon vom Home-Bildschirm, nicht mehr das Safari-Lesezeichen. Beide haben getrennte Speicher — Werte, die du in Safari einträgst, tauchen in der installierten App nicht auf.
+Ab jetzt kannst du die App sowohl über das Icon als auch über Safari öffnen — beide zeigen denselben Stand, weil die Daten im Backend liegen und nicht mehr lokal im Browser.
 
 ---
 
@@ -92,13 +92,11 @@ Danach die App schliessen (im App-Umschalter nach oben wischen) und neu öffnen.
 
 ## Deine Daten sichern
 
-Die App speichert im `localStorage` deines iPhones. **iOS löscht diesen Speicher, wenn eine Web-App mehrere Wochen nicht geöffnet wird.**
+Die App speichert nichts mehr auf dem iPhone selbst — alles liegt in der Postgres-Datenbank hinter deinem Backend. Das Gerät wechseln ist damit kein Problem mehr, ein Ausfall oder versehentliches Löschen der Datenbank aber schon.
 
-Deshalb: alle paar Wochen unter **Daten** → **Als JSON exportieren** und die Datei in der Dateien-App oder iCloud ablegen. Über **JSON importieren** holst du alles zurück.
+Deshalb trotzdem: alle paar Wochen unter **Daten** → **Als JSON exportieren** und die Datei in der Dateien-App oder iCloud ablegen. Über **JSON importieren** holst du den Stand zurück. Für die Datenbank selbst lohnt sich zusätzlich ein reguläres `pg_dump`, falls du sie nicht ohnehin über einen gehosteten Anbieter mit Backups laufen lässt.
 
-Es lohnt sich, das gleich beim ersten Öffnen einmal durchzuspielen, damit du den Weg kennst. Der Moment, in dem du ihn brauchst, ist der ungünstigste zum Ausprobieren.
-
-Ein Backup ist auch nötig, bevor du das Gerät wechselst — die Daten wandern nicht automatisch mit.
+Es lohnt sich, den JSON-Export/Import gleich beim ersten Öffnen einmal durchzuspielen, damit du den Weg kennst. Der Moment, in dem du ihn brauchst, ist der ungünstigste zum Ausprobieren.
 
 ---
 
@@ -116,5 +114,5 @@ Pages braucht ein bis zwei Minuten. Prüfe unter Settings → Pages, ob Branch `
 **Nach einem Update stehen noch die alten Trainingstage in der App**
 Der Plan wird beim ersten Start gespeichert und danach nicht mehr überschrieben — sonst würden deine eigenen Änderungen verloren gehen. Nach einem Struktur-Update einmal **Daten** → **Plan auf Ausgangsversion zurücksetzen**. Protokollierte Einheiten bleiben dabei erhalten.
 
-**Daten weg**
-Wurde die App über Safari statt über das Home-Bildschirm-Icon geöffnet? Oder war sie länger als ein paar Wochen ungenutzt? Dann hilft nur der JSON-Import.
+**Daten weg oder Seite zeigt nichts an**
+Läuft das Backend noch, und ist es unter der in `index.html` gesetzten `API_BASE`-Adresse erreichbar? Das ist inzwischen die häufigste Ursache — nicht mehr ein lokaler Speicher, der abgelaufen ist. Prüfe `docs/BACKEND.md`. Als letzter Ausweg hilft der JSON-Import eines früheren Exports.
