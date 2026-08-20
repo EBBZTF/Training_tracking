@@ -5,7 +5,7 @@
    VERSION um eins erhöhen. Sonst zeigt dein iPhone weiter
    die alte, zwischengespeicherte Fassung an.
    --------------------------------------------------------- */
-const VERSION = 3;
+const VERSION = 4;
 const CACHE = `training-v${VERSION}`;
 
 const FILES = [
@@ -41,7 +41,9 @@ self.addEventListener('activate', ev => {
 // So bekommst du Updates ohne Neuinstallation, funktionierst aber im Keller
 // ohne Empfang trotzdem.
 self.addEventListener('fetch', ev => {
-  if (ev.request.method !== 'GET') return;
+  // Nur den App-Shell-Origin cachen — API-Aufrufe an das Backend
+  // (anderer Origin) sollen immer live gehen, nie aus dem Cache.
+  if (ev.request.method !== 'GET' || new URL(ev.request.url).origin !== self.location.origin) return;
   ev.respondWith(
     fetch(ev.request)
       .then(res => {

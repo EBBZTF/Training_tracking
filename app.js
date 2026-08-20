@@ -1,23 +1,26 @@
 /* =========================================================
-   Speicher — funktioniert in der Claude-Vorschau (window.storage)
-   und als eigenständige Datei auf dem iPhone (localStorage).
+   Speicher — Backend-API (Postgres ist die einzige Quelle).
+   API_BASE lässt sich vor dem Laden von app.js überschreiben,
+   z.B. <script>window.API_BASE = 'https://api.example.com/api'</script>
    ========================================================= */
-const KEY = 'trainingsplan:v1';
-const useClaude = typeof window.storage !== 'undefined' && window.storage;
+const API_BASE = window.API_BASE || 'http://localhost:8080/api';
 
 async function save(data){
-  const json = JSON.stringify(data);
   try{
-    if(useClaude) await window.storage.set(KEY, json);
-    else localStorage.setItem(KEY, json);
+    const res = await fetch(`${API_BASE}/state`, {
+      method: 'PUT',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(data)
+    });
+    if(!res.ok) throw new Error('HTTP '+res.status);
   }catch(e){ toast('Speichern fehlgeschlagen'); console.error(e); }
 }
 async function load(){
   try{
-    if(useClaude){ const r = await window.storage.get(KEY); return r ? JSON.parse(r.value) : null; }
-    const raw = localStorage.getItem(KEY);
-    return raw ? JSON.parse(raw) : null;
-  }catch(e){ return null; }
+    const res = await fetch(`${API_BASE}/state`);
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    return await res.json();
+  }catch(e){ toast('Laden fehlgeschlagen — Backend erreichbar?'); console.error(e); return null; }
 }
 
 /* =========================================================
