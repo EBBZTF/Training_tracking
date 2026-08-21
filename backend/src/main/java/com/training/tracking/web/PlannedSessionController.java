@@ -69,18 +69,20 @@ public class PlannedSessionController {
         return orNoContent(plannedSessionService.reschedule(principal.id(), id, request));
     }
 
+    /** 200 for the updated session, 204 when skipping it slid a rotating series along — see {@link #update}. */
     @PutMapping("/{id}/status")
-    public PlannedSessionDto updateStatus(@AuthenticationPrincipal UserPrincipal principal,
-                                           @PathVariable Long id,
-                                           @Valid @RequestBody UpdateStatusRequest request) {
-        return plannedSessionService.updateStatus(principal.id(), id, request);
+    public ResponseEntity<PlannedSessionDto> updateStatus(@AuthenticationPrincipal UserPrincipal principal,
+                                                           @PathVariable Long id,
+                                                           @Valid @RequestBody UpdateStatusRequest request) {
+        return orNoContent(plannedSessionService.updateStatus(principal.id(), id, request));
     }
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(@AuthenticationPrincipal UserPrincipal principal,
                                         @PathVariable Long id,
-                                        @RequestParam(required = false) String scope) {
-        plannedSessionService.delete(principal.id(), id, scope);
+                                        @RequestParam(required = false) String scope,
+                                        @RequestParam(required = false) String rotation) {
+        plannedSessionService.delete(principal.id(), id, scope, rotation);
         return ResponseEntity.noContent().build();
     }
 

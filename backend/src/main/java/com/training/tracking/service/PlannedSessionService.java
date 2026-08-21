@@ -1,6 +1,7 @@
 package com.training.tracking.service;
 
 import com.training.tracking.domain.PlannedSession;
+import com.training.tracking.domain.RecurringRule;
 import com.training.tracking.dto.CreatePlannedSessionRequest;
 import com.training.tracking.dto.PlannedSessionDto;
 import com.training.tracking.dto.RescheduleRequest;
@@ -48,6 +49,24 @@ public class PlannedSessionService {
                 return FUTURE;
             }
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "scope must be one or future");
+        }
+    }
+
+    /** What a missed occurrence does to the rotation of its series. */
+    public enum Rotation {
+        /** The missed date keeps its cycle step; every later date shows the plan it already showed. */
+        HOLD,
+        /** The missed plan moves to the next date of the series, sliding the rest one step along. */
+        SHIFT;
+
+        static Rotation of(String raw) {
+            if (raw == null || raw.isBlank() || "hold".equals(raw)) {
+                return HOLD;
+            }
+            if ("shift".equals(raw)) {
+                return SHIFT;
+            }
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "rotation must be hold or shift");
         }
     }
 
@@ -124,26 +143,40 @@ public class PlannedSessionService {
         return toDto(session);
     }
 
+    /** Null means the rest of a rotating series moved along — the client must reload the range. */
     @Transactional
     public PlannedSessionDto updateStatus(Long userId, Long id, UpdateStatusRequest request) {
         if (!PlannedSession.STATUSES.contains(request.status())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "status must be one of " + PlannedSession.STATUSES);
         }
+        Rotation rotation = Rotation.of(request.rotation());
         PlannedSession session = findOwned(userId, id);
         session.setStatus(request.status());
         plannedSessionRepository.save(session);
+
+        if (rotation == Rotation.SHIFT
+                && PlannedSession.STATUS_SKIPPED.equals(request.status())
+                && session.getRule() != null) {
+            recurringRuleService.shiftRotationAfter(session);
+            return null;
+        }
         return toDto(session);
     }
 
     @Transactional
-    public void delete(Long userId, Long id, String scope) {
+    public void delete(Long userId, Long id, String scope, String rotationOption) {
+        Rotation rotation = Rotation.of(rotationOption);
         PlannedSession session = findOwned(userId, id);
         if (appliesToSeries(session, scope)) {
             recurringRuleService.endSeriesAt(session);
             return;
         }
         if (session.getRule() != null) {
+            if (rotation == Rotation.SHIFT) {
+                // Before the row goes, so the series still knows which step it is losing.
+                recurringRuleService.shiftRotationAfter(session);
+            }
             recurringRuleService.deleteOccurrence(session);
             return;
         }
@@ -177,6 +210,8 @@ public class PlannedSessionService {
                 session.getDayKey(),
                 session.getStatus(),
                 session.getNotes(),
-                session.getRule() == null ? null : session.getRule().getId());
+                session.getRule() == null ? null : session.getRule().getId(),
+                session.getRule() != null
+                        && RecurringRule.PLAN_ROTATION.equals(session.getRule().getPlanMode()));
     }
 }

@@ -22,6 +22,13 @@ public class RecurringRule {
     public static final String PATTERN_WEEKLY = "weekly";
     public static final String PATTERN_INTERVAL = "interval";
 
+    /** The pinned {@link #dayKey} on every generated date. */
+    public static final String PLAN_FIXED = "fixed";
+    /** One plan per weekday, from {@link RecurringRulePlan} rows keyed by weekday index. */
+    public static final String PLAN_WEEKDAY = "weekday";
+    /** An ordered cycle of plans, advancing one step per generated date. */
+    public static final String PLAN_ROTATION = "rotation";
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -33,9 +40,20 @@ public class RecurringRule {
     @JoinColumn(name = "session_type_id", nullable = false)
     private SessionType sessionType;
 
-    /** Client-facing id of the pinned workout plan, or null when the series carries no plan. */
+    /** Client-facing id of the pinned workout plan; only used by {@link #PLAN_FIXED}. */
     @Column(name = "day_key", length = 16)
     private String dayKey;
+
+    /** 'fixed' | 'weekday' | 'rotation' — which plan a generated date gets; DB CHECK guards the values. */
+    @Column(name = "plan_mode", nullable = false, length = 16)
+    private String planMode;
+
+    /**
+     * Cycle step this rule's {@link #startDate} sits on, so a series split mid-rotation carries on
+     * instead of restarting at its first plan. Always 0 outside {@link #PLAN_ROTATION}.
+     */
+    @Column(name = "rotation_offset", nullable = false)
+    private short rotationOffset;
 
     @Column(name = "scheduled_time")
     private LocalTime scheduledTime;
@@ -75,6 +93,12 @@ public class RecurringRule {
 
     public String getDayKey() { return dayKey; }
     public void setDayKey(String dayKey) { this.dayKey = dayKey; }
+
+    public String getPlanMode() { return planMode; }
+    public void setPlanMode(String planMode) { this.planMode = planMode; }
+
+    public short getRotationOffset() { return rotationOffset; }
+    public void setRotationOffset(short rotationOffset) { this.rotationOffset = rotationOffset; }
 
     public LocalTime getScheduledTime() { return scheduledTime; }
     public void setScheduledTime(LocalTime scheduledTime) { this.scheduledTime = scheduledTime; }

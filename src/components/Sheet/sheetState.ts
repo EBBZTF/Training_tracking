@@ -1,4 +1,4 @@
-import type { Day, ExerciseType, PlannedSession, Side } from '../../types';
+import type { Day, ExerciseType, PlannedSession, RecurringRule, Side } from '../../types';
 
 /** Which sheet is open, and the subject it was opened for. */
 export type SheetState =
@@ -10,4 +10,9 @@ export type SheetState =
   | { type: 'editPlan'; day: Day }
   | { type: 'addSession'; date: string }
   | { type: 'sessionDetail'; session: PlannedSession }
+  /**
+   * The rule is loaded before the sheet opens, so the form can start out filled in. `from` is the
+   * date the edit applies from — the occurrence it was opened on, matching "alle künftigen Termine".
+   */
+  | { type: 'editSeries'; rule: RecurringRule; from: string }
   | null;

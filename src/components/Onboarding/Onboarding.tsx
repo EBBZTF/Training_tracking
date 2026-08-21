@@ -85,6 +85,10 @@ export function Onboarding({ types, startDate, onAddType, onFinish, onSkip }: On
         weekdays: d.pattern === 'weekly' ? d.weekdays : undefined,
         intervalDays: d.pattern === 'interval' ? d.intervalDays : undefined,
         startDate,
+        // The first run has no workout plans yet, so there is nothing to vary across the dates;
+        // per-weekday plans and rotations are set up later, in the add-session sheet.
+        planMode: 'fixed' as const,
+        plans: [],
       })),
     );
     setSaving(false);

@@ -9,6 +9,8 @@ public record PlannedSessionDto(
         String status,
         String notes,
         /** Set when this session is an occurrence of a series; drives the scope prompt in the UI. */
-        Long ruleId
+        Long ruleId,
+        /** True when that series rotates its plans, so skipping asks whether to carry the plan over. */
+        boolean rotating
 ) {
 }

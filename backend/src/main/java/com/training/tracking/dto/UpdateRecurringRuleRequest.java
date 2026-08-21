@@ -5,7 +5,11 @@ import jakarta.validation.constraints.NotNull;
 
 import java.util.List;
 
-public record CreateRecurringRuleRequest(
+/**
+ * Redefines a series from {@code from} onwards (default: today). Occurrences before that date keep
+ * the definition they were generated with, which is what "ab hier" means everywhere else too.
+ */
+public record UpdateRecurringRuleRequest(
         @NotNull Long sessionTypeId,
         String dayId,
         String time,
@@ -13,7 +17,7 @@ public record CreateRecurringRuleRequest(
         @NotBlank String pattern,
         Integer weekdays,
         Integer intervalDays,
-        @NotBlank String startDate,
+        String from,
         String endDate,
         String planMode,
         List<RulePlanEntry> plans

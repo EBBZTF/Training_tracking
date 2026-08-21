@@ -134,9 +134,14 @@ Hevy and Strong instead keep *routines* reusable and let you schedule them.
 - Start date, optional end date; open-ended is allowed and renders indefinitely into future months.
 - Occurrences appear in the calendar visually identical to single sessions, with a subtle
   repeat marker.
-- Different rules can pin different plans to different weekdays: *Monday → Oberkörper,
-  Friday → Unterkörper*, both of type "Gym". (Two rules, one type.)
-- One rule per activity+pattern; editing the rule updates all future occurrences at once.
+- Different plans on different weekdays, in **one** series: *Monday → Beine, Thursday → Arme*
+  (plan mode `weekday`, V7). Two separate rules still work, but are no longer the only way.
+- A series can rotate an ordered cycle of plans instead — *Beine / Push / Pull*, one step per date,
+  independent of the weekday (plan mode `rotation`, V7). A cycle of three brings each plan back
+  every third session.
+- One rule per activity+pattern; editing the rule updates all future occurrences at once. The
+  rhythm and the plan assignment are edited through `PUT /api/recurring-rules/{id}`, which splits
+  the series at the chosen date exactly like a scope=future edit.
 
 ### US-2.7 Change one occurrence without wrecking the series ✅
 
@@ -156,6 +161,9 @@ already generated before it keep the old pattern.
 - Deleting all future occurrences ends the series at that date; past occurrences and their logged
   data remain.
 - No prompt at all for a session that is not part of a series.
+- Skipping or deleting one date of a **rotating** series asks what becomes of the plan it was
+  carrying: *verfallen lassen* (the missed date keeps its cycle step, later dates are untouched) or
+  *nachholen* (the missed plan moves to the next date and the rest slides one step along).
 
 ### US-2.8 Recurrence, but the plan changes over time ✅
 
@@ -360,12 +368,14 @@ From the interview, these are settled and not up for re-litigation while impleme
 | Starter templates | **Dropped.** No template library, no starter programs |
 | Default plan | No plan is seeded for anyone; the pistol program is not offered at all |
 | Recurrence | Real recurring rules: weekly on chosen weekdays, or every N days |
+| Plan per date | Three modes: one fixed plan, one plan per weekday, or a rotating cycle |
+| Missed date in a rotation | The user decides per case: let the plan lapse, or carry it to the next date |
 | Editing an occurrence | Apple-Calendar prompt: "Nur dieser Termin" / "Alle künftigen Termine" |
 | Series end | Open-ended allowed; optional end date; no retroactive edits to past sessions |
 | Session fields | Date, time, type, note. **No** duration, **no** distance, **no** logged actuals |
 | Plan ↔ type | A plan belongs permanently to one type; the type is editable from within the plan |
 | Multiple plans per type | Required — several Gym plans, scheduled individually |
-| Recurrence ↔ plan | A rule pins a specific plan: Monday this plan, Friday that plan |
+| Recurrence ↔ plan | A rule decides which plan each date gets: fixed, per weekday, or rotating |
 | Plan tab scope | Only days with something scheduled, horizontally scrollable, within the month |
 | Language | German; seeded English type labels get renamed |
 
@@ -404,6 +414,12 @@ What the neighbours do, and what this app should take from them.
 6. **Plan links survive a plan save** — `planned_sessions.day_id` was a FK to `days(id)`, which
    `PUT /api/state` deletes and recreates on every save, silently nulling the link. Now stored as
    `day_key`.
+7. **Plan modes on a series** (US-2.6, 2.7) — V7: `plan_mode` + `rotation_offset` on
+   `recurring_rules`, `recurring_rule_plans` for the per-weekday and per-cycle-step plans. The plan
+   for a date is a pure function of the rule and the date, so re-materializing or skipping an
+   occurrence never reshuffles the cycle; `rotation_offset` is what lets a split half carry on
+   mid-cycle. `rotation=hold|shift` on skip and single-occurrence delete, and
+   `GET`/`PUT /api/recurring-rules/{id}` for editing the series itself.
 
 ## Still open
 

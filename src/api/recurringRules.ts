@@ -1,4 +1,4 @@
-import type { NewRecurringRule, RecurringRule } from '../types';
+import type { NewRecurringRule, RecurringRule, RuleUpdate } from '../types';
 import { request } from './base';
 
 /**
@@ -7,4 +7,17 @@ import { request } from './base';
  */
 export function createRecurringRule(input: NewRecurringRule): Promise<RecurringRule | null> {
   return request<RecurringRule>('/recurring-rules', { method: 'POST', body: input });
+}
+
+/** The full series behind an occurrence — what the edit form needs, and the calendar never does. */
+export function loadRecurringRule(id: number): Promise<RecurringRule | null> {
+  return request<RecurringRule>(`/recurring-rules/${id}`);
+}
+
+/**
+ * Redefines a series from `input.from` onwards (default: today). Everything the occurrence-level
+ * edits cannot express lives here: the rhythm itself, and which plan each date gets.
+ */
+export function updateRecurringRule(id: number, input: RuleUpdate): Promise<RecurringRule | null> {
+  return request<RecurringRule>(`/recurring-rules/${id}`, { method: 'PUT', body: input });
 }

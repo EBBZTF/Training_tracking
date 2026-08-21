@@ -1,4 +1,4 @@
-import type { EditScope, PlannedSession, PlannedSessionStatus } from '../types';
+import type { EditScope, PlannedSession, PlannedSessionStatus, Rotation } from '../types';
 import { NO_CONTENT, request, requestOk, type NoContent } from './base';
 
 /**
@@ -43,17 +43,26 @@ export function reschedulePlannedSession(
   });
 }
 
+/** `rotation: 'shift'` on a skip answers 204: the rest of the rotation moved along with it. */
 export function updatePlannedSessionStatus(
   id: number,
   status: PlannedSessionStatus,
-): Promise<PlannedSession | null> {
-  return request<PlannedSession>(`/planned-sessions/${id}/status`, {
+  rotation?: Rotation,
+): Promise<PlannedSession | SeriesChanged | null> {
+  return request<PlannedSession | SeriesChanged>(`/planned-sessions/${id}/status`, {
     method: 'PUT',
-    body: { status },
+    body: { status, rotation },
   });
 }
 
-export function deletePlannedSession(id: number, scope?: EditScope): Promise<boolean> {
-  const query = scope ? `?${new URLSearchParams({ scope })}` : '';
+export function deletePlannedSession(
+  id: number,
+  scope?: EditScope,
+  rotation?: Rotation,
+): Promise<boolean> {
+  const params = new URLSearchParams();
+  if (scope) params.set('scope', scope);
+  if (rotation) params.set('rotation', rotation);
+  const query = params.size > 0 ? `?${params}` : '';
   return requestOk(`/planned-sessions/${id}${query}`, { method: 'DELETE' });
 }

@@ -4,6 +4,8 @@ import type {
   NewRecurringRule,
   PlannedSession,
   PlannedSessionStatus,
+  Rotation,
+  RuleUpdate,
   SessionType,
 } from '../types';
 import {
@@ -16,7 +18,7 @@ import {
   SERIES_CHANGED,
 } from '../api/plannedSessions';
 import { loadSessionTypes, createSessionType, deleteSessionType } from '../api/sessionTypes';
-import { createRecurringRule } from '../api/recurringRules';
+import { createRecurringRule, loadRecurringRule, updateRecurringRule } from '../api/recurringRules';
 import { monthRange } from '../utils/date';
 
 export function usePlannedSessions(notify: (message: string) => void) {
@@ -141,19 +143,20 @@ export function usePlannedSessions(notify: (message: string) => void) {
     [optimistically],
   );
 
+  /** `rotation: 'shift'` carries the plan of a skipped occurrence over to the next date. */
   const markStatus = useCallback(
-    (id: number, status: PlannedSessionStatus) =>
+    (id: number, status: PlannedSessionStatus, rotation?: Rotation) =>
       optimistically(
         (s) => ({ ...s, status }),
         id,
-        () => updatePlannedSessionStatus(id, status),
+        () => updatePlannedSessionStatus(id, status, rotation),
         'Status konnte nicht gespeichert werden',
       ),
     [optimistically],
   );
 
   const removeSession = useCallback(
-    async (id: number, scope: EditScope = 'one') => {
+    async (id: number, scope: EditScope = 'one', rotation?: Rotation) => {
       let removed: PlannedSession | undefined;
       setSessions((prev) =>
         prev.filter((s) => {
@@ -162,14 +165,15 @@ export function usePlannedSessions(notify: (message: string) => void) {
           return false;
         }),
       );
-      const ok = await deletePlannedSession(id, scope);
+      const ok = await deletePlannedSession(id, scope, rotation);
       if (!ok) {
         if (removed) setSessions((prev) => [...prev, removed as PlannedSession]);
         notify('Löschen fehlgeschlagen');
         return false;
       }
-      // Ending a series drops every later occurrence, not just the one we removed locally.
-      if (scope === 'future') reload();
+      // Ending a series drops every later occurrence, and carrying a missed plan over re-plans
+      // them — either way more changed than the row we removed locally.
+      if (scope === 'future' || rotation === 'shift') reload();
       return true;
     },
     [notify, reload],
@@ -195,6 +199,29 @@ export function usePlannedSessions(notify: (message: string) => void) {
   const addRule = useCallback(
     async (input: NewRecurringRule) => (await addRules([input])) === 1,
     [addRules],
+  );
+
+  const loadRule = useCallback(
+    async (id: number) => {
+      const rule = await loadRecurringRule(id);
+      if (!rule) notify('Serie konnte nicht geladen werden');
+      return rule;
+    },
+    [notify],
+  );
+
+  /** Redefines a series from `input.from` onwards, which re-plans every occurrence after it. */
+  const updateRule = useCallback(
+    async (id: number, input: RuleUpdate) => {
+      const updated = await updateRecurringRule(id, input);
+      if (!updated) {
+        notify('Serie konnte nicht gespeichert werden');
+        return false;
+      }
+      reload();
+      return true;
+    },
+    [notify, reload],
   );
 
   const addSessionType = useCallback(
@@ -240,6 +267,8 @@ export function usePlannedSessions(notify: (message: string) => void) {
     addSession,
     addRule,
     addRules,
+    loadRule,
+    updateRule,
     updateSession,
     reschedule,
     markStatus,

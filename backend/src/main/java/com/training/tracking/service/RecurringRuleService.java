@@ -3,11 +3,16 @@ package com.training.tracking.service;
 import com.training.tracking.domain.PlannedSession;
 import com.training.tracking.domain.RecurringRule;
 import com.training.tracking.domain.RecurringRuleException;
+import com.training.tracking.domain.RecurringRulePlan;
 import com.training.tracking.domain.SessionType;
 import com.training.tracking.dto.CreateRecurringRuleRequest;
+import com.training.tracking.dto.RecurringRuleDefinition;
 import com.training.tracking.dto.RecurringRuleDto;
+import com.training.tracking.dto.RulePlanEntry;
+import com.training.tracking.dto.UpdateRecurringRuleRequest;
 import com.training.tracking.repository.PlannedSessionRepository;
 import com.training.tracking.repository.RecurringRuleExceptionRepository;
+import com.training.tracking.repository.RecurringRulePlanRepository;
 import com.training.tracking.repository.RecurringRuleRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -31,26 +36,36 @@ import java.util.Set;
  * <p>Occurrences are materialized into {@code planned_sessions} the first time a date range is
  * requested, rather than expanded on every read: that way status, notes and logging work on a
  * series occurrence exactly as on a one-off session, and no read path needs to know about rules.
+ *
+ * <p>A rule answers two questions separately: its {@code pattern} decides *when* it generates a
+ * date, its {@code planMode} decides *which* workout plan lands on that date — the same plan every
+ * time, one per weekday, or the next step of a rotation.
  */
 @Service
 public class RecurringRuleService {
 
     private static final short ALL_WEEKDAYS = 127;
     private static final int MAX_INTERVAL_DAYS = 365;
+    private static final int WEEKDAYS_IN_WEEK = 7;
+    /** Matches the position CHECK on recurring_rule_plans; only there to bound a stray request. */
+    private static final int MAX_ROTATION_PLANS = 12;
     /** Upper bound for "every remaining date"; LocalDate.MAX overflows a Postgres DATE. */
     private static final LocalDate FAR_FUTURE = LocalDate.of(9999, 12, 31);
 
     private final RecurringRuleRepository ruleRepository;
     private final RecurringRuleExceptionRepository exceptionRepository;
+    private final RecurringRulePlanRepository planRepository;
     private final PlannedSessionRepository plannedSessionRepository;
     private final ScheduleRefs refs;
 
     public RecurringRuleService(RecurringRuleRepository ruleRepository,
                                 RecurringRuleExceptionRepository exceptionRepository,
+                                RecurringRulePlanRepository planRepository,
                                 PlannedSessionRepository plannedSessionRepository,
                                 ScheduleRefs refs) {
         this.ruleRepository = ruleRepository;
         this.exceptionRepository = exceptionRepository;
+        this.planRepository = planRepository;
         this.plannedSessionRepository = plannedSessionRepository;
         this.refs = refs;
     }
@@ -59,19 +74,41 @@ public class RecurringRuleService {
     public RecurringRuleDto create(Long userId, CreateRecurringRuleRequest request) {
         RecurringRule rule = new RecurringRule();
         rule.setUserId(userId);
-        rule.setSessionType(refs.sessionType(userId, request.sessionTypeId()));
-        rule.setDayKey(refs.dayKey(userId, request.dayId()));
-        rule.setScheduledTime(ScheduleRefs.parseTime(request.time()));
-        rule.setNotes(request.notes());
         rule.setStartDate(ScheduleRefs.parseDate(request.startDate()));
-        rule.setEndDate(ScheduleRefs.parseOptionalDate(request.endDate()));
-        applyPattern(rule, request.pattern(), request.weekdays(), request.intervalDays());
-        if (rule.getEndDate() != null && rule.getEndDate().isBefore(rule.getStartDate())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "endDate must not be before startDate");
-        }
         rule.setCreatedAt(Instant.now());
-        ruleRepository.save(rule);
-        return toDto(rule);
+        applyDefinition(userId, rule, request);
+        ruleRepository.saveAndFlush(rule);
+        return toDto(rule, writePlans(userId, rule, request));
+    }
+
+    @Transactional(readOnly = true)
+    public RecurringRuleDto find(Long userId, Long ruleId) {
+        RecurringRule rule = findOwned(userId, ruleId);
+        return toDto(rule, plansOf(rule));
+    }
+
+    /**
+     * Redefines a series from {@code request.from()} onwards. Occurrences before that date keep the
+     * old definition, so a rotation reordered today does not rewrite last month's calendar.
+     */
+    @Transactional
+    public RecurringRuleDto update(Long userId, Long ruleId, UpdateRecurringRuleRequest request) {
+        RecurringRule rule = findOwned(userId, ruleId);
+        LocalDate from = request.from() == null || request.from().isBlank()
+                ? LocalDate.now()
+                : ScheduleRefs.parseDate(request.from());
+        // Past its end this rule generates nothing, so redefining it from there would not change the
+        // calendar — it would add a second series next to whatever took over.
+        if (rule.getEndDate() != null && from.isAfter(rule.getEndDate())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "series already ends before " + from);
+        }
+        RecurringRule tail = splitAt(rule, from);
+        applyDefinition(userId, tail, request);
+        // The plans below are a freshly stated cycle, so it starts at its own first step.
+        tail.setRotationOffset((short) 0);
+        ruleRepository.saveAndFlush(tail);
+        return toDto(tail, writePlans(userId, tail, request));
     }
 
     /**
@@ -93,9 +130,10 @@ public class RecurringRuleService {
             plannedSessionRepository
                     .findAllByRule_IdAndOccurrenceDateBetween(rule.getId(), windowStart, windowEnd)
                     .forEach(s -> taken.add(s.getOccurrenceDate()));
+            List<RecurringRulePlan> plans = plansOf(rule);
             for (LocalDate date : occurrences(rule, windowStart, windowEnd)) {
                 if (taken.add(date)) {
-                    created.add(newOccurrence(rule, date));
+                    created.add(newOccurrence(rule, plans, date));
                 }
             }
         }
@@ -128,6 +166,8 @@ public class RecurringRuleService {
             tail.setWeekdays(moveWeekday(tail.getWeekdays(),
                     occurrenceDate.getDayOfWeek(), newDate.getDayOfWeek()));
         }
+        // The offset splitAt computed belongs to this occurrence, and its new date is the tail's
+        // first one, so a rotating series keeps this occurrence's plan when it moves.
         tail.setStartDate(newDate);
         if (tail.getEndDate() != null && tail.getEndDate().isBefore(newDate)) {
             tail.setEndDate(newDate);
@@ -140,8 +180,40 @@ public class RecurringRuleService {
     public void updateSeries(PlannedSession occurrence, SessionType type, String dayKey, String notes) {
         RecurringRule tail = splitAt(occurrence.getRule(), occurrence.getOccurrenceDate());
         tail.setSessionType(type);
-        tail.setDayKey(dayKey);
         tail.setNotes(notes);
+        // One plan for every later occurrence is exactly what a fixed series is; reordering a
+        // rotation instead of replacing it is a series edit (PUT /api/recurring-rules/{id}).
+        tail.setPlanMode(RecurringRule.PLAN_FIXED);
+        tail.setDayKey(dayKey);
+        tail.setRotationOffset((short) 0);
+        clearPlans(tail);
+        ruleRepository.save(tail);
+    }
+
+    /**
+     * Carries the plan of a missed occurrence over to the next date of the series: everything from
+     * there on slides one cycle step back. The alternative — letting the missed slot burn its step,
+     * so the following dates keep the plans they already showed — needs no work at all, which is
+     * why only this direction has a method.
+     */
+    @Transactional
+    public void shiftRotationAfter(PlannedSession occurrence) {
+        RecurringRule rule = occurrence.getRule();
+        if (rule == null || !RecurringRule.PLAN_ROTATION.equals(rule.getPlanMode())) {
+            return;
+        }
+        List<RecurringRulePlan> plans = plansOf(rule);
+        if (plans.size() < 2) {
+            return;
+        }
+        LocalDate missed = occurrence.getOccurrenceDate();
+        LocalDate next = nextOccurrenceAfter(rule, missed);
+        if (next == null) {
+            return;
+        }
+        int carried = rotationStep(rule, missed, plans.size());
+        RecurringRule tail = splitAt(rule, next);
+        tail.setRotationOffset((short) carried);
         ruleRepository.save(tail);
     }
 
@@ -166,10 +238,9 @@ public class RecurringRuleService {
     }
 
     /**
-     * Splits the series at this occurrence and returns the part to mutate: a fresh rule covering
-     * this date onwards, so occurrences already generated before it keep the old pattern. When
-     * nothing precedes the occurrence there is nothing to preserve and the original rule is
-     * returned unchanged.
+     * Splits the series at this date and returns the part to mutate: a fresh rule covering that date
+     * onwards, so occurrences already generated before it keep the old definition. When nothing
+     * precedes the date there is nothing to preserve and the original rule is returned unchanged.
      */
     private RecurringRule splitAt(RecurringRule rule, LocalDate from) {
         dropPlannedFrom(rule, from);
@@ -177,6 +248,7 @@ public class RecurringRuleService {
             return rule;
         }
 
+        List<RecurringRulePlan> plans = plansOf(rule);
         RecurringRule tail = new RecurringRule();
         tail.setUserId(rule.getUserId());
         tail.setSessionType(rule.getSessionType());
@@ -186,10 +258,19 @@ public class RecurringRuleService {
         tail.setPattern(rule.getPattern());
         tail.setWeekdays(rule.getWeekdays());
         tail.setIntervalDays(rule.getIntervalDays());
+        tail.setPlanMode(rule.getPlanMode());
+        // Where the cycle stands on `from`, so the new half continues it instead of restarting.
+        tail.setRotationOffset(RecurringRule.PLAN_ROTATION.equals(rule.getPlanMode()) && !plans.isEmpty()
+                ? (short) rotationStep(rule, from, plans.size())
+                : (short) 0);
         tail.setStartDate(from);
-        tail.setEndDate(rule.getEndDate());
+        tail.setEndDate(endDateAfterSplit(rule.getEndDate(), from));
         tail.setCreatedAt(Instant.now());
         ruleRepository.saveAndFlush(tail);
+
+        for (RecurringRulePlan plan : plans) {
+            planRepository.save(new RecurringRulePlan(tail, plan.getPosition(), plan.getDayKey()));
+        }
 
         // Skipped dates from here on belong to the new half of the series.
         List<LocalDate> moved = exceptionRepository.findExcludedDates(rule.getId(), from, FAR_FUTURE);
@@ -198,9 +279,25 @@ public class RecurringRuleService {
             exceptionRepository.save(new RecurringRuleException(tail, date));
         }
 
-        rule.setEndDate(from.minusDays(1));
+        // Only ever shortens: a half that already ended earlier must not be revived by a later split.
+        rule.setEndDate(earlierOf(rule.getEndDate(), from.minusDays(1)));
         ruleRepository.save(rule);
         return tail;
+    }
+
+    /**
+     * The end date the new half of a split carries. A series can be split at a date past its own
+     * end — editing a series from today, when an earlier split already ended this half — and a rule
+     * that ends before it starts is not a rule at all, so such a half covers the split date alone
+     * until the caller states an end of its own.
+     */
+    static LocalDate endDateAfterSplit(LocalDate end, LocalDate from) {
+        return end != null && end.isBefore(from) ? from : end;
+    }
+
+    /** The end date of the old half after a split: whichever comes first, so it can only shrink. */
+    static LocalDate earlierOf(LocalDate end, LocalDate lastDayBeforeSplit) {
+        return end == null ? lastDayBeforeSplit : min(end, lastDayBeforeSplit);
     }
 
     /** Removes still-planned occurrences from `from` onwards; done and skipped ones stay as history. */
@@ -219,19 +316,114 @@ public class RecurringRuleService {
                 new RecurringRuleException(occurrence.getRule(), occurrence.getOccurrenceDate()));
     }
 
-    private PlannedSession newOccurrence(RecurringRule rule, LocalDate date) {
+    private PlannedSession newOccurrence(RecurringRule rule, List<RecurringRulePlan> plans, LocalDate date) {
         PlannedSession session = new PlannedSession();
         session.setUserId(rule.getUserId());
         session.setScheduledDate(date);
         session.setScheduledTime(rule.getScheduledTime());
         session.setSessionType(rule.getSessionType());
-        session.setDayKey(rule.getDayKey());
+        session.setDayKey(resolvePlan(rule, plans, date));
         session.setNotes(rule.getNotes());
         session.setStatus(PlannedSession.STATUS_PLANNED);
         session.setRule(rule);
         session.setOccurrenceDate(date);
         session.setCreatedAt(Instant.now());
         return session;
+    }
+
+    private RecurringRule findOwned(Long userId, Long ruleId) {
+        return ruleRepository.findById(ruleId)
+                .filter(r -> r.getUserId().equals(userId))
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "recurring rule not found"));
+    }
+
+    private List<RecurringRulePlan> plansOf(RecurringRule rule) {
+        return RecurringRule.PLAN_FIXED.equals(rule.getPlanMode())
+                ? List.of()
+                : planRepository.findAllByIdRuleIdOrderByIdPositionAsc(rule.getId());
+    }
+
+    private void clearPlans(RecurringRule rule) {
+        planRepository.deleteAllByIdRuleId(rule.getId());
+        planRepository.flush();
+    }
+
+    /** Everything a definition carries except its start date, which create and update set themselves. */
+    private void applyDefinition(Long userId, RecurringRule rule, RecurringRuleDefinition definition) {
+        rule.setSessionType(refs.sessionType(userId, definition.sessionTypeId()));
+        rule.setScheduledTime(ScheduleRefs.parseTime(definition.time()));
+        rule.setNotes(definition.notes());
+        rule.setEndDate(ScheduleRefs.parseOptionalDate(definition.endDate()));
+        applyPattern(rule, definition.pattern(), definition.weekdays(), definition.intervalDays());
+        rule.setPlanMode(planMode(definition, rule.getPattern()));
+        rule.setDayKey(RecurringRule.PLAN_FIXED.equals(rule.getPlanMode())
+                ? refs.dayKey(userId, definition.dayId())
+                : null);
+        if (rule.getEndDate() != null && rule.getEndDate().isBefore(rule.getStartDate())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "endDate must not be before startDate");
+        }
+    }
+
+    /** Replaces the rule's plan rows with the ones the request states; fixed rules end up with none. */
+    private List<RecurringRulePlan> writePlans(Long userId, RecurringRule rule,
+                                                RecurringRuleDefinition definition) {
+        clearPlans(rule);
+        if (RecurringRule.PLAN_FIXED.equals(rule.getPlanMode())) {
+            return List.of();
+        }
+        boolean byWeekday = RecurringRule.PLAN_WEEKDAY.equals(rule.getPlanMode());
+        List<RecurringRulePlan> rows = new ArrayList<>();
+        List<RulePlanEntry> entries = definition.plans();
+        for (int i = 0; i < entries.size(); i++) {
+            RulePlanEntry entry = entries.get(i);
+            short position = byWeekday ? entry.position().shortValue() : (short) i;
+            rows.add(new RecurringRulePlan(rule, position, refs.dayKey(userId, entry.dayId())));
+        }
+        return planRepository.saveAll(rows);
+    }
+
+    /** Validates the plan mode against the rhythm and the plans it was given. */
+    private static String planMode(RecurringRuleDefinition definition, String pattern) {
+        String mode = definition.planMode();
+        if (mode == null || mode.isBlank() || RecurringRule.PLAN_FIXED.equals(mode)) {
+            return RecurringRule.PLAN_FIXED;
+        }
+        boolean byWeekday = RecurringRule.PLAN_WEEKDAY.equals(mode);
+        if (!byWeekday && !RecurringRule.PLAN_ROTATION.equals(mode)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "planMode must be fixed, weekday or rotation");
+        }
+        if (byWeekday && !RecurringRule.PATTERN_WEEKLY.equals(pattern)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "planMode weekday needs the weekly pattern");
+        }
+        List<RulePlanEntry> entries = definition.plans();
+        if (entries == null || entries.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "planMode " + mode + " needs plans");
+        }
+        if (entries.size() > MAX_ROTATION_PLANS) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "at most " + MAX_ROTATION_PLANS + " plans per rule");
+        }
+        Set<Integer> positions = new HashSet<>();
+        for (RulePlanEntry entry : entries) {
+            if (entry.dayId() == null || entry.dayId().isBlank()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "every plan entry needs a dayId");
+            }
+            if (!byWeekday) {
+                continue;
+            }
+            Integer position = entry.position();
+            if (position == null || position < 0 || position >= WEEKDAYS_IN_WEEK) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "weekday plan positions run from 0 (Mo) to 6 (So)");
+            }
+            if (!positions.add(position)) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "one plan per weekday at most");
+            }
+        }
+        return mode;
     }
 
     private void applyPattern(RecurringRule rule, String pattern, Integer weekdays, Integer intervalDays) {
@@ -277,6 +469,72 @@ public class RecurringRuleService {
         return dates;
     }
 
+    /** The plan a rule puts on `date`: its pinned one, the one for that weekday, or the cycle's step. */
+    static String resolvePlan(RecurringRule rule, List<RecurringRulePlan> plans, LocalDate date) {
+        if (RecurringRule.PLAN_WEEKDAY.equals(rule.getPlanMode())) {
+            short weekday = (short) (date.getDayOfWeek().getValue() - 1);
+            return plans.stream()
+                    .filter(p -> p.getPosition() == weekday)
+                    .map(RecurringRulePlan::getDayKey)
+                    .findFirst()
+                    .orElse(null);
+        }
+        if (RecurringRule.PLAN_ROTATION.equals(rule.getPlanMode()) && !plans.isEmpty()) {
+            return plans.get(rotationStep(rule, date, plans.size())).getDayKey();
+        }
+        return rule.getDayKey();
+    }
+
+    /**
+     * Which step of the cycle `date` lands on. A pure function of the rule and the date, so
+     * re-materializing a window, or skipping an occurrence, never shifts the rest of the rotation.
+     */
+    static int rotationStep(RecurringRule rule, LocalDate date, int cycleLength) {
+        return (int) Math.floorMod(rule.getRotationOffset() + slotIndex(rule, date), (long) cycleLength);
+    }
+
+    /** How many dates the rule generates strictly before `date`, counted from its start. */
+    static long slotIndex(RecurringRule rule, LocalDate date) {
+        if (!date.isAfter(rule.getStartDate())) {
+            return 0;
+        }
+        long days = ChronoUnit.DAYS.between(rule.getStartDate(), date);
+        if (RecurringRule.PATTERN_INTERVAL.equals(rule.getPattern())) {
+            int step = rule.getIntervalDays();
+            return (days + step - 1) / step;
+        }
+        int mask = rule.getWeekdays() & ALL_WEEKDAYS;
+        long weeks = days / WEEKDAYS_IN_WEEK;
+        long count = weeks * Integer.bitCount(mask);
+        // At most six days are left over once the whole weeks are counted in one go.
+        for (LocalDate d = rule.getStartDate().plusWeeks(weeks); d.isBefore(date); d = d.plusDays(1)) {
+            if ((mask & weekdayBit(d.getDayOfWeek())) != 0) {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    /** The rule's next date after `date`, or null when its window ends first. */
+    static LocalDate nextOccurrenceAfter(RecurringRule rule, LocalDate date) {
+        LocalDate end = rule.getEndDate();
+        if (RecurringRule.PATTERN_INTERVAL.equals(rule.getPattern())) {
+            LocalDate next = date.plusDays(rule.getIntervalDays());
+            return end != null && next.isAfter(end) ? null : next;
+        }
+        int mask = rule.getWeekdays() & ALL_WEEKDAYS;
+        for (int i = 1; i <= WEEKDAYS_IN_WEEK; i++) {
+            LocalDate next = date.plusDays(i);
+            if (end != null && next.isAfter(end)) {
+                return null;
+            }
+            if ((mask & weekdayBit(next.getDayOfWeek())) != 0) {
+                return next;
+            }
+        }
+        return null;
+    }
+
     /** Mo=1, Di=2, Mi=4, Do=8, Fr=16, Sa=32, So=64 — matches the mask the client sends. */
     static int weekdayBit(DayOfWeek day) {
         return 1 << (day.getValue() - 1);
@@ -294,7 +552,7 @@ public class RecurringRuleService {
         return a.isBefore(b) ? a : b;
     }
 
-    private static RecurringRuleDto toDto(RecurringRule rule) {
+    private static RecurringRuleDto toDto(RecurringRule rule, List<RecurringRulePlan> plans) {
         return new RecurringRuleDto(
                 rule.getId(),
                 rule.getSessionType().getId(),
@@ -305,6 +563,10 @@ public class RecurringRuleService {
                 rule.getWeekdays() == null ? null : (int) rule.getWeekdays(),
                 rule.getIntervalDays() == null ? null : (int) rule.getIntervalDays(),
                 rule.getStartDate().toString(),
-                rule.getEndDate() == null ? null : rule.getEndDate().toString());
+                rule.getEndDate() == null ? null : rule.getEndDate().toString(),
+                rule.getPlanMode(),
+                plans.stream()
+                        .map(p -> new RulePlanEntry((int) p.getPosition(), p.getDayKey()))
+                        .toList());
     }
 }

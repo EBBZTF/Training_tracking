@@ -343,15 +343,42 @@ function TrainingApp({ userEmail, onLogout }: { userEmail: string; onLogout: () 
                 );
                 if (updated) closeSheet();
               }}
-              onMarkStatus={async (status) => {
-                if (await sessions.markStatus(sheet.session.id, status)) closeSheet();
+              onMarkStatus={async (status, rotation) => {
+                if (await sessions.markStatus(sheet.session.id, status, rotation)) closeSheet();
               }}
-              onDelete={async (scope) => {
-                if (await sessions.removeSession(sheet.session.id, scope)) closeSheet();
+              onDelete={async (scope, rotation) => {
+                if (await sessions.removeSession(sheet.session.id, scope, rotation)) closeSheet();
               }}
               onStartWorkout={() => {
                 openTraining(sheet.session);
                 closeSheet();
+              }}
+              onEditSeries={
+                sheet.session.ruleId == null
+                  ? undefined
+                  : async () => {
+                      const ruleId = sheet.session.ruleId as number;
+                      const rule = await sessions.loadRule(ruleId);
+                      if (rule) setSheet({ type: 'editSeries', rule, from: sheet.session.date });
+                    }
+              }
+            />
+          )}
+
+          {sheet.type === 'editSeries' && (
+            <AddSessionSheet
+              key={sheet.rule.id}
+              date={sheet.from}
+              rule={sheet.rule}
+              types={sessions.types}
+              days={t.plan.days}
+              onAddType={sessions.addSessionType}
+              onDeleteType={sessions.removeSessionType}
+              onSubmitRule={async ({ startDate, ...rest }) => {
+                // The sheet's "Ab" date is where the new definition takes over.
+                if (await sessions.updateRule(sheet.rule.id, { ...rest, from: startDate })) {
+                  closeSheet();
+                }
               }}
             />
           )}

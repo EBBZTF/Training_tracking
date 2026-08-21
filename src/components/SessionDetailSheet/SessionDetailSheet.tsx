@@ -4,6 +4,7 @@ import type {
   EditScope,
   PlannedSession,
   PlannedSessionStatus,
+  Rotation,
   SessionType,
 } from '../../types';
 import { sessionTypeAccent } from '../../utils/cssVar';
@@ -16,9 +17,11 @@ interface SessionDetailSheetProps {
   days: Day[];
   onReschedule: (date: string, time: string | undefined, scope: EditScope) => void;
   onChangePlan: (dayId: string | undefined, scope: EditScope) => void;
-  onMarkStatus: (status: PlannedSessionStatus) => void;
-  onDelete: (scope: EditScope) => void;
+  onMarkStatus: (status: PlannedSessionStatus, rotation?: Rotation) => void;
+  onDelete: (scope: EditScope, rotation?: Rotation) => void;
   onStartWorkout: () => void;
+  /** Absent for a one-off: there is no series to edit. */
+  onEditSeries?: () => void;
 }
 
 const STATUS_LABEL: Record<PlannedSessionStatus, string> = {
@@ -27,14 +30,21 @@ const STATUS_LABEL: Record<PlannedSessionStatus, string> = {
   skipped: 'Übersprungen',
 };
 
-/** An edit that needs the "nur dieser Termin?" question answered before it runs. */
-type Pending = { action: 'move' } | { action: 'plan' } | { action: 'delete' };
+/**
+ * An edit that needs a question answered before it runs: which occurrences it applies to, and — for
+ * a rotating series losing a date — what happens to the plan that date was going to carry.
+ */
+type Pending =
+  | { action: 'move' | 'plan' | 'delete'; ask: 'scope' }
+  | { action: 'delete' | 'skip'; ask: 'rotation' };
 
-const PENDING_PROMPT: Record<Pending['action'], string> = {
+const SCOPE_PROMPT: Record<'move' | 'plan' | 'delete', string> = {
   move: 'Diesen Termin verschieben oder die ganze Serie ab hier?',
   plan: 'Plan nur für diesen Termin ändern oder ab hier für alle?',
   delete: 'Diesen Termin löschen oder die Serie ab hier beenden?',
 };
+
+const ROTATION_PROMPT = 'Der Plan dieses Termins — verfallen lassen oder beim nächsten nachholen?';
 
 export function SessionDetailSheet({
   session,
@@ -46,6 +56,7 @@ export function SessionDetailSheet({
   onMarkStatus,
   onDelete,
   onStartWorkout,
+  onEditSeries,
 }: SessionDetailSheetProps) {
   const [date, setDate] = useState(session.date);
   const [time, setTime] = useState(session.time ?? '');
@@ -53,22 +64,45 @@ export function SessionDetailSheet({
   const [pending, setPending] = useState<Pending | null>(null);
 
   const recurring = session.ruleId != null;
+  const rotating = recurring && session.rotating === true;
 
-  const run = (action: Pending['action'], scope: EditScope) => {
+  const run = (action: 'move' | 'plan' | 'delete', scope: EditScope) => {
     setPending(null);
     if (action === 'move') onReschedule(date, time || undefined, scope);
     if (action === 'plan') onChangePlan(dayId || undefined, scope);
-    if (action === 'delete') onDelete(scope);
+    // Dropping one date of a rotation asks what becomes of its plan first.
+    if (action === 'delete') {
+      if (scope === 'one' && rotating) {
+        setPending({ action: 'delete', ask: 'rotation' });
+        return;
+      }
+      onDelete(scope);
+    }
   };
 
-  /** A one-off never asks; a series always does. */
-  const request = (action: Pending['action']) => {
+  const runRotation = (action: 'delete' | 'skip', rotation: Rotation) => {
+    setPending(null);
+    if (action === 'delete') onDelete('one', rotation);
+    else onMarkStatus('skipped', rotation);
+  };
+
+  /** A one-off never asks; a series asks which occurrences an edit means. */
+  const request = (action: 'move' | 'plan' | 'delete') => {
     if (!recurring) {
       if (action === 'delete' && !window.confirm('Diesen Termin löschen?')) return;
       run(action, 'one');
       return;
     }
-    setPending({ action });
+    setPending({ action, ask: 'scope' });
+  };
+
+  /** Skipping only needs a question when the missed plan could move to the next date. */
+  const requestSkip = () => {
+    if (!rotating) {
+      onMarkStatus('skipped');
+      return;
+    }
+    setPending({ action: 'skip', ask: 'rotation' });
   };
 
   const movable = date !== session.date || (time || undefined) !== session.time;
@@ -83,6 +117,7 @@ export function SessionDetailSheet({
       <div className={styles.sub}>
         {STATUS_LABEL[session.status]}
         {recurring && ' · Teil einer Serie'}
+        {rotating && ' mit Plan-Rotation'}
       </div>
 
       {session.notes && <div className={styles.notes}>{session.notes}</div>}
@@ -93,9 +128,9 @@ export function SessionDetailSheet({
         </button>
       )}
 
-      {pending && (
+      {pending?.ask === 'scope' && (
         <div className={styles.scope}>
-          <div className={styles.scopeText}>{PENDING_PROMPT[pending.action]}</div>
+          <div className={styles.scopeText}>{SCOPE_PROMPT[pending.action]}</div>
           <button
             type="button"
             className={styles.rowButton}
@@ -109,6 +144,29 @@ export function SessionDetailSheet({
             onClick={() => run(pending.action, 'future')}
           >
             Alle künftigen Termine
+          </button>
+          <button type="button" className={styles.ghost} onClick={() => setPending(null)}>
+            Abbrechen
+          </button>
+        </div>
+      )}
+
+      {pending?.ask === 'rotation' && (
+        <div className={styles.scope}>
+          <div className={styles.scopeText}>{ROTATION_PROMPT}</div>
+          <button
+            type="button"
+            className={styles.rowButton}
+            onClick={() => runRotation(pending.action, 'hold')}
+          >
+            Verfallen lassen
+          </button>
+          <button
+            type="button"
+            className={styles.rowButton}
+            onClick={() => runRotation(pending.action, 'shift')}
+          >
+            Nachholen — alle folgenden verschieben
           </button>
           <button type="button" className={styles.ghost} onClick={() => setPending(null)}>
             Abbrechen
@@ -163,10 +221,16 @@ export function SessionDetailSheet({
         <button type="button" className={styles.rowButton} onClick={() => onMarkStatus('done')}>
           Erledigt markieren
         </button>
-        <button type="button" className={styles.rowButton} onClick={() => onMarkStatus('skipped')}>
-          Überspringen
+        <button type="button" className={styles.rowButton} onClick={requestSkip}>
+          Überspringen{rotating ? ' …' : ''}
         </button>
       </div>
+
+      {recurring && onEditSeries && (
+        <button type="button" className={styles.ghost} onClick={onEditSeries}>
+          Serie bearbeiten — Rhythmus und Pläne
+        </button>
+      )}
 
       <button type="button" className={styles.danger} onClick={() => request('delete')}>
         {recurring ? 'Löschen …' : 'Löschen'}

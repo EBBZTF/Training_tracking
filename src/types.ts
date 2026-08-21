@@ -92,6 +92,8 @@ export interface PlannedSession {
   notes?: string;
   /** Set when this session is one occurrence of a series; drives the "nur dieser Termin?" prompt. */
   ruleId?: number;
+  /** True when that series rotates its plans, so skipping asks what happens to the missed plan. */
+  rotating?: boolean;
 }
 
 /** Weekday bits in a weekly rule's mask: Mo=1, Di=2, Mi=4, Do=8, Fr=16, Sa=32, So=64. */
@@ -99,9 +101,22 @@ export type WeekdayMask = number;
 
 export type RecurrencePattern = 'weekly' | 'interval';
 
+/**
+ * Which workout each date of a series gets. The pattern says *when* the series trains, this says
+ * *what*: the same plan every time, one plan per weekday, or the next plan of a rotation.
+ */
+export type PlanMode = 'fixed' | 'weekday' | 'rotation';
+
+/** One plan slot: `position` is the weekday index (Mo=0) for 'weekday', the cycle step for 'rotation'. */
+export interface RulePlan {
+  position: number;
+  dayId: string;
+}
+
 export interface RecurringRule {
   id: number;
   sessionTypeId: number;
+  /** The pinned plan; only used by planMode 'fixed'. */
   dayId?: string;
   time?: string;
   notes?: string;
@@ -110,10 +125,22 @@ export interface RecurringRule {
   intervalDays?: number;
   startDate: string;
   endDate?: string;
+  planMode: PlanMode;
+  /** Empty for 'fixed'; keyed by weekday for 'weekday'; in cycle order for 'rotation'. */
+  plans: RulePlan[];
 }
 
 /** Everything needed to create a recurring rule; the id is assigned by the backend. */
 export type NewRecurringRule = Omit<RecurringRule, 'id'>;
 
+/** Redefining a series: `from` is the first date the new definition applies to (default today). */
+export type RuleUpdate = Omit<NewRecurringRule, 'startDate'> & { from?: string };
+
 /** Which occurrences an edit to a series applies to. */
 export type EditScope = 'one' | 'future';
+
+/**
+ * What skipping or deleting one occurrence of a rotation does to the plans after it: `hold` lets
+ * the missed slot burn its cycle step, `shift` carries the missed plan over to the next date.
+ */
+export type Rotation = 'hold' | 'shift';
