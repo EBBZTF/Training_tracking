@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Root changelog. Spring Boot runs this on startup (spring.liquibase.change-log in
+  application.yml); it holds no changesets of its own, only the ordered list of change files.
+
+  Adding a schema change means adding a new file under changes/ and one <include> line here.
+  Never edit a file that has already been deployed: Liquibase stores a checksum per changeset in
+  DATABASECHANGELOG and refuses to start if a deployed changeset's content no longer matches.
+-->
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                            http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <include file="changes/001-init-schema.sql" relativeToChangelogFile="true"/>
+
+</databaseChangeLog>

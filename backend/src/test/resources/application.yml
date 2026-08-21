@@ -7,7 +7,10 @@ spring:
   jpa:
     hibernate:
       ddl-auto: create-drop
-  flyway:
+  # Tests run against in-memory H2 and let Hibernate build the schema (ddl-auto above). The
+  # changelog is deliberately Postgres-only — partial indexes, BIGSERIAL, TIMESTAMPTZ — so it is
+  # not applied here.
+  liquibase:
     enabled: false
 
 app:

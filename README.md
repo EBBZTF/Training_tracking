@@ -18,7 +18,7 @@ The frontend is a React + TypeScript + SCSS single-page app, built with Vite.
 | `src/styles/` | Design tokens as CSS custom properties (`global.scss`) + the primitives components compose from (`shared.module.scss`) |
 | `public/` | Static assets served as-is: icons, and inputs to the PWA plugin |
 | `vite.config.ts` | Build config, incl. `vite-plugin-pwa` (generates the manifest + service worker) |
-| `backend/` | Java (Spring Boot) REST API + Postgres schema — see [`docs/BACKEND.md`](docs/BACKEND.md) |
+| `backend/` | Java (Spring Boot) REST API + Liquibase-managed Postgres schema — see [`docs/BACKEND.md`](docs/BACKEND.md) |
 | `docker-compose.yml` | Local dev stack: Postgres + backend |
 | `.github/workflows/deploy.yml` | Builds the frontend and deploys it to GitHub Pages on push to `main` |
 | `docs/SETUP.md` | Step-by-step guide: GitHub repo → GitHub Pages → install on iPhone |

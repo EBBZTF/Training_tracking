@@ -60,8 +60,13 @@ Backend (run from `backend/`):
 
 ```bash
 ./mvnw test           # run backend tests (StateServiceTest, AuthFlowTest, JwtServiceTest, etc.)
-./mvnw spring-boot:run # run backend locally
+./mvnw spring-boot:run # run backend locally (applies the Liquibase changelog on startup)
+./mvnw liquibase:status # pending changesets against the DB in liquibase.properties
 ```
+
+Schema changes go in a new file under `src/main/resources/db/changelog/changes/` plus an
+`<include>` in `db.changelog-master.xml` — never by editing a deployed changeset, whose checksum
+Liquibase has already recorded. See [`docs/BACKEND.md`](docs/BACKEND.md).
 
 Local full stack:
 
