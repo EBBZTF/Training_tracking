@@ -1,0 +1,302 @@
+import { useState } from 'react';
+import type { RecurrencePattern, SessionType } from '../../types';
+import { sessionTypeAccent } from '../../utils/cssVar';
+import { WEEKDAY_SHORT } from '../../utils/date';
+import styles from './Onboarding.module.scss';
+
+interface OnboardingProps {
+  types: SessionType[];
+  today: string;
+  onAddType: (input: { label: string; color?: string }) => Promise<SessionType | null>;
+  onFinish: (
+    rules: {
+      sessionTypeId: number;
+      time?: string;
+      pattern: RecurrencePattern;
+      weekdays?: number;
+      intervalDays?: number;
+      startDate: string;
+    }[],
+  ) => Promise<void>;
+  onSkip: () => void;
+}
+
+/** One activity the user picked, with the rhythm they want it on. */
+interface Draft {
+  typeId: number;
+  pattern: RecurrencePattern;
+  weekdays: number;
+  intervalDays: number;
+  time: string;
+}
+
+const MONDAY = 1;
+const NEW_TYPE_COLOR = '#5b9bc9';
+
+function describe(draft: Draft): string {
+  if (draft.pattern === 'interval') {
+    const every = draft.intervalDays === 1 ? 'jeden Tag' : `alle ${draft.intervalDays} Tage`;
+    return draft.time ? `${every}, ${draft.time}` : every;
+  }
+  const days = WEEKDAY_SHORT.filter((_, i) => draft.weekdays & (1 << i)).join(', ');
+  const when = days || 'kein Tag gewählt';
+  return draft.time ? `${when}, ${draft.time}` : when;
+}
+
+export function Onboarding({ types, today, onAddType, onFinish, onSkip }: OnboardingProps) {
+  const [step, setStep] = useState(0);
+  const [drafts, setDrafts] = useState<Draft[]>([]);
+  const [newLabel, setNewLabel] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const typeById = new Map(types.map((t) => [t.id, t]));
+
+  const toggleType = (typeId: number) =>
+    setDrafts((prev) =>
+      prev.some((d) => d.typeId === typeId)
+        ? prev.filter((d) => d.typeId !== typeId)
+        : [...prev, { typeId, pattern: 'weekly', weekdays: MONDAY, intervalDays: 3, time: '' }],
+    );
+
+  const patchDraft = (typeId: number, patch: Partial<Draft>) =>
+    setDrafts((prev) => prev.map((d) => (d.typeId === typeId ? { ...d, ...patch } : d)));
+
+  const handleAddType = async () => {
+    const label = newLabel.trim();
+    if (!label) return;
+    setSaving(true);
+    const created = await onAddType({ label, color: NEW_TYPE_COLOR });
+    setSaving(false);
+    if (created) {
+      setNewLabel('');
+      toggleType(created.id);
+    }
+  };
+
+  const handleFinish = async () => {
+    setSaving(true);
+    await onFinish(
+      drafts.map((d) => ({
+        sessionTypeId: d.typeId,
+        time: d.time || undefined,
+        pattern: d.pattern,
+        weekdays: d.pattern === 'weekly' ? d.weekdays : undefined,
+        intervalDays: d.pattern === 'interval' ? d.intervalDays : undefined,
+        startDate: today,
+      })),
+    );
+    setSaving(false);
+  };
+
+  // A weekly rhythm with no weekday selected has nothing to generate.
+  const ready =
+    drafts.length > 0 && drafts.every((d) => d.pattern !== 'weekly' || d.weekdays !== 0);
+
+  return (
+    <div className={styles.overlay}>
+      <div className={styles.body}>
+        <div className={styles.steps}>
+          {[0, 1, 2].map((i) => (
+            <span key={i} className={`${styles.stepDot} ${i <= step ? styles.stepDotOn : ''}`} />
+          ))}
+        </div>
+
+        {step === 0 && (
+          <>
+            <div className={styles.eyebrow}>Schritt 1 von 3</div>
+            <h1 className={styles.title}>Was willst du trainieren?</h1>
+            <p className={styles.text}>
+              Wähle alles, was du regelmässig machst. Später kommt jederzeit Neues dazu.
+            </p>
+            <div className={styles.chips}>
+              {types.map((t) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  className={`${styles.chip} ${
+                    drafts.some((d) => d.typeId === t.id) ? styles.chipOn : ''
+                  }`}
+                  style={sessionTypeAccent(t)}
+                  onClick={() => toggleType(t.id)}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+            <div className={styles.newRow}>
+              <input
+                value={newLabel}
+                onChange={(e) => setNewLabel(e.target.value)}
+                placeholder="Eigene Aktivität, z. B. Klettern"
+              />
+              <button type="button" onClick={handleAddType} disabled={!newLabel.trim() || saving}>
+                Hinzufügen
+              </button>
+            </div>
+          </>
+        )}
+
+        {step === 1 && (
+          <>
+            <div className={styles.eyebrow}>Schritt 2 von 3</div>
+            <h1 className={styles.title}>Wie oft, und wann?</h1>
+            <p className={styles.text}>
+              Zum Beispiel jeden Montag um 07:00 laufen, oder alle drei Tage Mobility.
+            </p>
+            {drafts.map((draft) => {
+              const type = typeById.get(draft.typeId);
+              return (
+                <div key={draft.typeId} className={styles.card} style={sessionTypeAccent(type)}>
+                  <div className={styles.cardHead}>
+                    <span className={styles.dot} />
+                    <span className={styles.cardTitle}>{type?.label ?? 'Aktivität'}</span>
+                  </div>
+
+                  <div className={styles.modeRow}>
+                    <button
+                      type="button"
+                      className={`${styles.mode} ${
+                        draft.pattern === 'weekly' ? styles.modeOn : ''
+                      }`}
+                      onClick={() => patchDraft(draft.typeId, { pattern: 'weekly' })}
+                    >
+                      Bestimmte Wochentage
+                    </button>
+                    <button
+                      type="button"
+                      className={`${styles.mode} ${
+                        draft.pattern === 'interval' ? styles.modeOn : ''
+                      }`}
+                      onClick={() => patchDraft(draft.typeId, { pattern: 'interval' })}
+                    >
+                      Alle X Tage
+                    </button>
+                  </div>
+
+                  {draft.pattern === 'weekly' ? (
+                    <div className={styles.weekdays}>
+                      {WEEKDAY_SHORT.map((label, index) => (
+                        <button
+                          key={label}
+                          type="button"
+                          className={`${styles.weekday} ${
+                            draft.weekdays & (1 << index) ? styles.weekdayOn : ''
+                          }`}
+                          aria-pressed={(draft.weekdays & (1 << index)) !== 0}
+                          onClick={() =>
+                            patchDraft(draft.typeId, { weekdays: draft.weekdays ^ (1 << index) })
+                          }
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
+
+                  <div className={styles.inlineRow}>
+                    {draft.pattern === 'interval' && (
+                      <div className={styles.inlineField}>
+                        <label>Abstand in Tagen</label>
+                        <input
+                          type="number"
+                          min={1}
+                          max={365}
+                          value={draft.intervalDays}
+                          onChange={(e) =>
+                            patchDraft(draft.typeId, { intervalDays: Number(e.target.value) })
+                          }
+                        />
+                      </div>
+                    )}
+                    <div className={styles.inlineField}>
+                      <label>Zeit (optional)</label>
+                      <input
+                        type="time"
+                        value={draft.time}
+                        onChange={(e) => patchDraft(draft.typeId, { time: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </>
+        )}
+
+        {step === 2 && (
+          <>
+            <div className={styles.eyebrow}>Schritt 3 von 3</div>
+            <h1 className={styles.title}>Das kommt in deinen Kalender</h1>
+            <ul className={styles.summary}>
+              {drafts.map((draft) => (
+                <li key={draft.typeId} className={styles.summaryItem}>
+                  <span>{typeById.get(draft.typeId)?.label ?? 'Aktivität'}</span>
+                  <span className={styles.summaryWhen}>{describe(draft)}</span>
+                </li>
+              ))}
+            </ul>
+            <ul className={styles.hints}>
+              <li className={styles.hint}>
+                <span className={styles.hintMark}>+</span>
+                <span>
+                  Im Kalender einen Tag antippen, um einmalig etwas einzuplanen — oder eine weitere
+                  Serie anzulegen.
+                </span>
+              </li>
+              <li className={styles.hint}>
+                <span className={styles.hintMark}>↻</span>
+                <span>
+                  Wiederkehrende Termine sind mit ↻ markiert. Beim Verschieben oder Löschen fragt
+                  die App, ob nur dieser Termin oder alle künftigen gemeint sind.
+                </span>
+              </li>
+              <li className={styles.hint}>
+                <span className={styles.hintMark}>≡</span>
+                <span>
+                  Für Kraft-Trainings kannst du einen Plan mit Übungen anlegen und ihn einem Termin
+                  zuordnen. Dann trägst du im Training deine Sätze direkt ein.
+                </span>
+              </li>
+            </ul>
+          </>
+        )}
+      </div>
+
+      <div className={styles.footer}>
+        {step < 2 ? (
+          <button
+            type="button"
+            className={styles.solid}
+            onClick={() => setStep(step + 1)}
+            disabled={step === 0 ? drafts.length === 0 : !ready}
+          >
+            Weiter
+          </button>
+        ) : (
+          <button
+            type="button"
+            className={styles.solid}
+            onClick={handleFinish}
+            disabled={!ready || saving}
+          >
+            Los geht's
+          </button>
+        )}
+        <div className={styles.footRow}>
+          <button
+            type="button"
+            className={styles.link}
+            onClick={() => (step === 0 ? onSkip() : setStep(step - 1))}
+          >
+            {step === 0 ? 'Überspringen' : 'Zurück'}
+          </button>
+          {step > 0 && (
+            <button type="button" className={styles.link} onClick={onSkip}>
+              Überspringen
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}

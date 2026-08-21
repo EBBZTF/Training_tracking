@@ -1,0 +1,66 @@
+.card {
+  margin: 22px 16px 0;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--k, var(--faint));
+  border-radius: 12px;
+  padding: 14px;
+  background: var(--panel);
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--k, var(--faint));
+}
+
+.title {
+  font-size: 17px;
+  font-weight: 650;
+}
+
+.repeat {
+  color: var(--faint);
+  font-size: 13px;
+}
+
+.meta {
+  margin-top: 6px;
+  font-size: 12.5px;
+  color: var(--mute);
+  font-variant-numeric: tabular-nums;
+}
+
+.notes {
+  margin-top: 12px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--mute);
+  white-space: pre-wrap;
+}
+
+.row {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.mini {
+  flex: 1;
+  font-size: 13px;
+  padding: 11px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  color: var(--mute);
+  text-align: center;
+}
+
+.ghost {
+  composes: ghost from '../../styles/shared.module.scss';
+}

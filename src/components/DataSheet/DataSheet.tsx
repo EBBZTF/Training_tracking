@@ -11,6 +11,7 @@ interface DataSheetProps {
   notify: (message: string) => void;
   userEmail: string;
   onLogout: () => void;
+  onReopenIntro: () => void;
 }
 
 function isAppState(value: unknown): value is AppState {
@@ -19,7 +20,16 @@ function isAppState(value: unknown): value is AppState {
   return !!v.plan && Array.isArray(v.logs);
 }
 
-export function DataSheet({ state, today, onImport, onReset, notify, userEmail, onLogout }: DataSheetProps) {
+export function DataSheet({
+  state,
+  today,
+  onImport,
+  onReset,
+  notify,
+  userEmail,
+  onLogout,
+  onReopenIntro,
+}: DataSheetProps) {
   const fileRef = useRef<HTMLInputElement>(null);
 
   const handleExport = () => {
@@ -51,9 +61,9 @@ export function DataSheet({ state, today, onImport, onReset, notify, userEmail, 
   };
 
   const handleReset = () => {
-    if (window.confirm('Plan zurücksetzen? Protokollierte Einheiten bleiben erhalten.')) {
+    if (window.confirm('Alle Pläne löschen? Protokollierte Einheiten bleiben erhalten.')) {
       onReset();
-      notify('Plan zurückgesetzt');
+      notify('Pläne gelöscht');
     }
   };
 
@@ -70,8 +80,11 @@ export function DataSheet({ state, today, onImport, onReset, notify, userEmail, 
       <button type="button" className={styles.ghost} onClick={() => fileRef.current?.click()}>
         JSON importieren
       </button>
+      <button type="button" className={styles.ghost} onClick={onReopenIntro}>
+        Einführung nochmal ansehen
+      </button>
       <button type="button" className={styles.reset} onClick={handleReset}>
-        Plan auf Ausgangsversion zurücksetzen
+        Alle Pläne löschen
       </button>
 
       <h2 className={styles.title}>Konto</h2>

@@ -1,21 +1,28 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { AppState, BlockRef, Exercise, Mode, Side } from '../types';
-import { attachDesc, defaultPlan } from '../data/defaultPlan';
+import type { AppState, BlockRef, Day, Exercise, Side, Slot } from '../types';
+import { attachDesc, emptyPlan, uid } from '../data/plan';
 import { loadState, saveState } from '../api/client';
 import * as planOps from '../state/planOps';
 import * as sessionOps from '../state/sessionOps';
-import { isoDate } from '../utils/date';
 
-export function useTrainingState(notify: (message: string) => void) {
+/** Which day is being looked at: the date logs are written under, and the plan shown for it. */
+export interface Selection {
+  date: string;
+  dayId: string;
+}
+
+/**
+ * Plan and logs for the selected day. The selection itself is controlled by the caller, because in
+ * log mode it follows what the calendar has scheduled and in edit mode it follows the plan list.
+ */
+export function useTrainingState(notify: (message: string) => void, selection: Selection) {
   const [state, setState] = useState<AppState>(() => ({
-    plan: attachDesc(defaultPlan()),
+    plan: emptyPlan(),
     logs: [],
   }));
-  const [dayId, setDayId] = useState('mo');
-  const [mode, setMode] = useState<Mode>('log');
-  const [today, setToday] = useState(() => isoDate(new Date()));
   const [open, setOpen] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
+  const { date: today, dayId } = selection;
 
   const persist = useCallback(
     async (next: AppState) => {
@@ -33,10 +40,9 @@ export function useTrainingState(notify: (message: string) => void) {
       if (data && data.plan) {
         setState({ plan: attachDesc(data.plan), logs: data.logs });
       } else if (data) {
-        // Brand-new user: no plan saved yet, seed the default one.
-        const next = { plan: attachDesc(defaultPlan()), logs: data.logs };
-        setState(next);
-        void persist(next);
+        // Brand-new user: nothing saved yet. Stay empty and write nothing — the account only gets
+        // a plan once she creates one, which is what the onboarding check keys off.
+        setState({ plan: emptyPlan(), logs: data.logs });
       } else {
         notify('Laden fehlgeschlagen — Backend erreichbar?');
       }
@@ -79,7 +85,7 @@ export function useTrainingState(notify: (message: string) => void) {
     [persist],
   );
 
-  const resetPlan = useCallback(() => updatePlan(() => attachDesc(defaultPlan())), [updatePlan]);
+  const resetPlan = useCallback(() => updatePlan(emptyPlan), [updatePlan]);
 
   const addExercise = useCallback(
     (ref: BlockRef) => updatePlan((p) => planOps.addExercise(p, ref)),
@@ -87,6 +93,21 @@ export function useTrainingState(notify: (message: string) => void) {
   );
   const addBlock = useCallback(
     (forDayId: string) => updatePlan((p) => planOps.addBlockToDay(p, forDayId)),
+    [updatePlan],
+  );
+  /** Returns the new plan so the caller can select it. */
+  const addDay = useCallback(
+    (input: { title: string; short: string; slot: Slot }) => {
+      const day: Day = {
+        id: uid(),
+        short: input.short,
+        slot: input.slot,
+        title: input.title,
+        blocks: [],
+      };
+      updatePlan((p) => planOps.addDay(p, day));
+      return day;
+    },
     [updatePlan],
   );
   const deleteExercise = useCallback(
@@ -162,7 +183,6 @@ export function useTrainingState(notify: (message: string) => void) {
     plan: state.plan,
     logs: state.logs,
     dayId,
-    mode,
     today,
     open,
     ready,
@@ -170,9 +190,6 @@ export function useTrainingState(notify: (message: string) => void) {
     session,
     blocks: planOps.allBlocksForDay(state.plan, day),
     findExercise: (id: string) => planOps.findExercise(state.plan, id),
-    setDayId,
-    setMode,
-    setToday,
     setOpen,
     getVal,
     lastVal,
@@ -180,6 +197,7 @@ export function useTrainingState(notify: (message: string) => void) {
     toggleWarmupItem,
     addExercise,
     addBlock,
+    addDay,
     deleteExercise,
     moveExercise,
     setExerciseUni,

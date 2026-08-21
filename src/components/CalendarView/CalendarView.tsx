@@ -1,5 +1,5 @@
 import type { PlannedSession, SessionType } from '../../types';
-import { addMonths, formatMonthLabel, isoDate, monthGrid } from '../../utils/date';
+import { addMonths, formatMonthLabel, isoDate, monthGrid, WEEKDAY_SHORT } from '../../utils/date';
 import { sessionTypeAccent } from '../../utils/cssVar';
 import styles from './CalendarView.module.scss';
 
@@ -11,8 +11,6 @@ interface CalendarViewProps {
   onSelectDay: (date: string) => void;
   onSelectSession: (session: PlannedSession) => void;
 }
-
-const WEEKDAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
 
 export function CalendarView({
   month,
@@ -56,7 +54,7 @@ export function CalendarView({
       </button>
 
       <div className={styles.weekdays}>
-        {WEEKDAYS.map((w) => (
+        {WEEKDAY_SHORT.map((w) => (
           <div key={w} className={styles.weekday}>
             {w}
           </div>
@@ -93,8 +91,11 @@ export function CalendarView({
                       e.stopPropagation();
                       onSelectSession(s);
                     }}
+                    title={typeById.get(s.sessionTypeId)?.label ?? ''}
                   >
+                    {s.time && <span className={styles.pillTime}>{s.time.slice(0, 5)} </span>}
                     {typeById.get(s.sessionTypeId)?.label ?? '?'}
+                    {s.ruleId != null && <span className={styles.repeat}> ↻</span>}
                   </button>
                 ))}
               </span>

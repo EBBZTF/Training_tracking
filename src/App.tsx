@@ -10,6 +10,9 @@ import { HistorySheet } from './components/HistorySheet/HistorySheet';
 import { DataSheet } from './components/DataSheet/DataSheet';
 import { AddSessionSheet } from './components/AddSessionSheet/AddSessionSheet';
 import { SessionDetailSheet } from './components/SessionDetailSheet/SessionDetailSheet';
+import { NewPlanSheet } from './components/NewPlanSheet/NewPlanSheet';
+import { EmptyTraining } from './components/EmptyTraining/EmptyTraining';
+import { Onboarding } from './components/Onboarding/Onboarding';
 import { Toast } from './components/Toast/Toast';
 import { AuthScreen } from './components/AuthScreen/AuthScreen';
 import type { SheetState } from './components/types';
@@ -17,8 +20,18 @@ import { useTrainingState } from './hooks/useTrainingState';
 import { usePlannedSessions } from './hooks/usePlannedSessions';
 import { useToast } from './hooks/useToast';
 import { useAuth } from './auth/AuthContext';
-import type { ExerciseType, Mode, Side } from './types';
-import { monthRange } from './utils/date';
+import { PlainSession } from './components/PlainSession/PlainSession';
+import type { TabItem } from './components/Tabs/Tabs';
+import type { ExerciseType, Mode, PlannedSession, Side } from './types';
+import {
+  addMonths,
+  formatMonthLabel,
+  formatTabDate,
+  isoDate,
+  isSameMonth,
+  monthRange,
+} from './utils/date';
+import { isOnboarded, markOnboarded } from './utils/onboarding';
 
 export function App() {
   const { status, user, logout } = useAuth();
@@ -31,11 +44,50 @@ export function App() {
 
 function TrainingApp({ userEmail, onLogout }: { userEmail: string; onLogout: () => void }) {
   const toast = useToast();
-  const t = useTrainingState(toast.show);
   const sessions = usePlannedSessions(toast.show);
   const [sheet, setSheet] = useState<SheetState>(null);
   const [view, setView] = useState<'training' | 'calendar'>('training');
   const [month, setMonth] = useState(() => new Date());
+  const [mode, setMode] = useState<Mode>('log');
+  /** Log mode follows the calendar: which scheduled session the training view is showing. */
+  const [selectedSessionId, setSelectedSessionId] = useState<number | null>(null);
+  /** Edit mode follows the plan list instead, since an unscheduled plan still needs editing. */
+  const [editDayId, setEditDayId] = useState('');
+  const [introDone, setIntroDone] = useState(false);
+  const [introForced, setIntroForced] = useState(false);
+
+  const today = isoDate(new Date());
+
+  // Only the sessions of the month on screen, in the order they happen.
+  const monthSessions = sessions.sessions
+    .filter((s) => isSameMonth(s.date, month))
+    .slice()
+    .sort((a, b) => a.date.localeCompare(b.date) || (a.time ?? '').localeCompare(b.time ?? ''));
+
+  // Nothing picked yet: today's session, else the next one coming up, else the last one.
+  const activeSession: PlannedSession | undefined =
+    monthSessions.find((s) => s.id === selectedSessionId) ??
+    monthSessions.find((s) => s.date === today) ??
+    monthSessions.find((s) => s.date > today) ??
+    monthSessions[monthSessions.length - 1];
+
+  const t = useTrainingState(
+    toast.show,
+    mode === 'edit'
+      ? { date: today, dayId: editDayId }
+      : { date: activeSession?.date ?? today, dayId: activeSession?.dayId ?? '' },
+  );
+
+  // A brand-new account has nothing to look at, so the introduction opens by itself — once.
+  const empty = t.plan.days.length === 0 && sessions.sessions.length === 0;
+  const introOpen =
+    introForced || (t.ready && sessions.ready && empty && !introDone && !isOnboarded(userEmail));
+
+  const closeIntro = () => {
+    markOnboarded(userEmail);
+    setIntroDone(true);
+    setIntroForced(false);
+  };
 
   useEffect(() => {
     const { from, to } = monthRange(month);
@@ -45,14 +97,40 @@ function TrainingApp({ userEmail, onLogout }: { userEmail: string; onLogout: () 
 
   if (!t.ready) return null;
 
-  const handleDayChange = (dayId: string) => {
-    t.setDayId(dayId);
+  const typeById = new Map(sessions.types.map((ty) => [ty.id, ty]));
+
+  const tabItems: TabItem[] =
+    mode === 'edit'
+      ? t.plan.days.map((d) => ({ id: d.id, top: d.short, bottom: d.slot ?? '' }))
+      : monthSessions.map((s) => {
+          const type = typeById.get(s.sessionTypeId);
+          const day = t.plan.days.find((d) => d.id === s.dayId);
+          return {
+            id: String(s.id),
+            top: formatTabDate(s.date),
+            bottom: day?.title ?? type?.label ?? '',
+            accent: type?.color,
+            dim: s.status !== 'planned',
+          };
+        });
+
+  const handleSelectTab = (id: string) => {
+    if (mode === 'edit') setEditDayId(id);
+    else setSelectedSessionId(Number(id));
     t.setOpen(null);
   };
 
-  const handleModeChange = (mode: Mode) => {
-    t.setMode(mode);
+  const handleModeChange = (next: Mode) => {
+    // Entering edit mode: start on the plan the selected day uses, if it has one.
+    if (next === 'edit' && !editDayId) setEditDayId(t.dayId || t.plan.days[0]?.id || '');
+    setMode(next);
     t.setOpen(null);
+  };
+
+  const openTraining = (session: PlannedSession) => {
+    setSelectedSessionId(session.id);
+    setMode('log');
+    setView('training');
   };
 
   const openEntry = (exId: string, side: Side, index: number, name: string, exType: ExerciseType) =>
@@ -80,21 +158,34 @@ function TrainingApp({ userEmail, onLogout }: { userEmail: string; onLogout: () 
   return (
     <>
       <Header
-        today={t.today}
-        onTodayChange={t.setToday}
-        days={t.plan.days}
-        dayId={t.dayId}
-        onDayChange={handleDayChange}
+        monthLabel={formatMonthLabel(month)}
         view={view}
         onViewChange={setView}
+        tabItems={tabItems}
+        activeTabId={
+          mode === 'edit' ? t.dayId || null : activeSession ? String(activeSession.id) : null
+        }
+        onSelectTab={handleSelectTab}
+        onPrevMonth={() => setMonth(addMonths(month, -1))}
+        onNextMonth={() => setMonth(addMonths(month, 1))}
+        onAddPlan={mode === 'edit' ? () => setSheet({ type: 'newPlan' }) : undefined}
       />
 
       <main>
-        {view === 'training' ? (
+        {view === 'calendar' ? (
+          <CalendarView
+            month={month}
+            onMonthChange={setMonth}
+            sessions={sessions.sessions}
+            types={sessions.types}
+            onSelectDay={(date) => setSheet({ type: 'addSession', date })}
+            onSelectSession={(session) => setSheet({ type: 'sessionDetail', session })}
+          />
+        ) : t.day ? (
           <DayView
             day={t.day}
             blocks={t.blocks}
-            mode={t.mode}
+            mode={mode}
             warmup={t.plan.warmup}
             session={t.session}
             warmOpen={t.open === 'warm'}
@@ -108,20 +199,26 @@ function TrainingApp({ userEmail, onLogout }: { userEmail: string; onLogout: () 
             actions={actions}
             onAddBlock={t.addBlock}
           />
+        ) : activeSession && mode === 'log' ? (
+          <PlainSession
+            session={activeSession}
+            type={typeById.get(activeSession.sessionTypeId)}
+            canAttachPlan={t.plan.days.length > 0}
+            onMarkStatus={(status) => void sessions.markStatus(activeSession.id, status)}
+            onAttachPlan={() => setSheet({ type: 'sessionDetail', session: activeSession })}
+          />
         ) : (
-          <CalendarView
-            month={month}
-            onMonthChange={setMonth}
-            sessions={sessions.sessions}
-            types={sessions.types}
-            onSelectDay={(date) => setSheet({ type: 'addSession', date })}
-            onSelectSession={(session) => setSheet({ type: 'sessionDetail', session })}
+          <EmptyTraining
+            hasPlans={t.plan.days.length > 0}
+            monthLabel={formatMonthLabel(month)}
+            onOpenCalendar={() => setView('calendar')}
+            onAddPlan={() => setSheet({ type: 'newPlan' })}
           />
         )}
       </main>
 
       <Footer
-        mode={t.mode}
+        mode={mode}
         onModeChange={handleModeChange}
         onOpenHistory={() => setSheet({ type: 'history' })}
         onOpenData={() => setSheet({ type: 'data' })}
@@ -172,6 +269,21 @@ function TrainingApp({ userEmail, onLogout }: { userEmail: string; onLogout: () 
               notify={toast.show}
               userEmail={userEmail}
               onLogout={onLogout}
+              onReopenIntro={() => {
+                closeSheet();
+                setIntroForced(true);
+              }}
+            />
+          )}
+
+          {sheet.type === 'newPlan' && (
+            <NewPlanSheet
+              onSubmit={(input) => {
+                const day = t.addDay(input);
+                setEditDayId(day.id);
+                setMode('edit');
+                closeSheet();
+              }}
             />
           )}
 
@@ -179,9 +291,14 @@ function TrainingApp({ userEmail, onLogout }: { userEmail: string; onLogout: () 
             <AddSessionSheet
               date={sheet.date}
               types={sessions.types}
+              days={t.plan.days}
               onAddType={sessions.addSessionType}
               onSubmit={async (input) => {
                 const created = await sessions.addSession(input);
+                if (created) closeSheet();
+              }}
+              onSubmitRule={async (input) => {
+                const created = await sessions.addRule(input);
                 if (created) closeSheet();
               }}
             />
@@ -192,21 +309,51 @@ function TrainingApp({ userEmail, onLogout }: { userEmail: string; onLogout: () 
               key={sheet.session.id}
               session={sheet.session}
               type={sessions.types.find((ty) => ty.id === sheet.session.sessionTypeId)}
-              onReschedule={async (date, time) => {
-                const updated = await sessions.reschedule(sheet.session.id, date, time);
+              day={t.plan.days.find((d) => d.id === sheet.session.dayId)}
+              days={t.plan.days}
+              onReschedule={async (date, time, scope) => {
+                const updated = await sessions.reschedule(sheet.session.id, date, time, scope);
+                if (updated) closeSheet();
+              }}
+              onChangePlan={async (dayId, scope) => {
+                const updated = await sessions.updateSession(
+                  sheet.session.id,
+                  { sessionTypeId: sheet.session.sessionTypeId, dayId, notes: sheet.session.notes },
+                  scope,
+                );
                 if (updated) closeSheet();
               }}
               onMarkStatus={async (status) => {
                 const updated = await sessions.markStatus(sheet.session.id, status);
                 if (updated) closeSheet();
               }}
-              onDelete={async () => {
-                const ok = await sessions.removeSession(sheet.session.id);
+              onDelete={async (scope) => {
+                const ok = await sessions.removeSession(sheet.session.id, scope);
                 if (ok) closeSheet();
+              }}
+              onStartWorkout={() => {
+                openTraining(sheet.session);
+                closeSheet();
               }}
             />
           )}
         </Sheet>
+      )}
+
+      {introOpen && (
+        <Onboarding
+          types={sessions.types}
+          today={t.today}
+          onAddType={sessions.addSessionType}
+          onFinish={async (rules) => {
+            for (const rule of rules) {
+              await sessions.addRule(rule);
+            }
+            closeIntro();
+            setView('calendar');
+          }}
+          onSkip={closeIntro}
+        />
       )}
 
       <Toast message={toast.message} />

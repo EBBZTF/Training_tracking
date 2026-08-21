@@ -4,6 +4,7 @@ import com.training.tracking.domain.SessionType;
 import com.training.tracking.dto.CreateSessionTypeRequest;
 import com.training.tracking.dto.SessionTypeDto;
 import com.training.tracking.repository.PlannedSessionRepository;
+import com.training.tracking.repository.RecurringRuleRepository;
 import com.training.tracking.repository.SessionTypeRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -18,11 +19,14 @@ public class SessionTypeService {
 
     private final SessionTypeRepository sessionTypeRepository;
     private final PlannedSessionRepository plannedSessionRepository;
+    private final RecurringRuleRepository recurringRuleRepository;
 
     public SessionTypeService(SessionTypeRepository sessionTypeRepository,
-                               PlannedSessionRepository plannedSessionRepository) {
+                               PlannedSessionRepository plannedSessionRepository,
+                               RecurringRuleRepository recurringRuleRepository) {
         this.sessionTypeRepository = sessionTypeRepository;
         this.plannedSessionRepository = plannedSessionRepository;
+        this.recurringRuleRepository = recurringRuleRepository;
     }
 
     @Transactional(readOnly = true)
@@ -56,6 +60,9 @@ public class SessionTypeService {
         }
         if (plannedSessionRepository.countBySessionTypeId(typeId) > 0) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "session type is still referenced by a planned session");
+        }
+        if (recurringRuleRepository.countBySessionTypeId(typeId) > 0) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "session type is still referenced by a recurring rule");
         }
         sessionTypeRepository.delete(type);
     }

@@ -44,3 +44,40 @@ const MONTH_LABEL_FORMAT = new Intl.DateTimeFormat('de-DE', { month: 'long', yea
 export function formatMonthLabel(d: Date): string {
   return MONTH_LABEL_FORMAT.format(d);
 }
+
+/** Wochentagskürzel, montagsbeginnend — passend zum Kalenderraster. */
+export const WEEKDAY_SHORT = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
+
+/** `YYYY-MM-DD` als lokales Datum, ohne die UTC-Verschiebung von `new Date(iso)`. */
+export function parseIso(iso: string): Date {
+  const [y, m, d] = iso.split('-').map(Number);
+  return new Date(y, m - 1, d);
+}
+
+/** Bit eines Wochentags in der Maske einer wöchentlichen Regel: Mo=1, Di=2 … So=64. */
+export function weekdayBit(iso: string): number {
+  return 1 << mondayIndex(parseIso(iso));
+}
+
+const DAY_LABEL_FORMAT = new Intl.DateTimeFormat('de-DE', { day: '2-digit', month: '2-digit' });
+
+/** z.B. "24.08." */
+export function formatDayLabel(iso: string): string {
+  return DAY_LABEL_FORMAT.format(parseIso(iso));
+}
+
+/** z.B. "Mo" */
+export function formatWeekday(iso: string): string {
+  return WEEKDAY_SHORT[mondayIndex(parseIso(iso))];
+}
+
+/** Liegt `iso` im Kalendermonat von `d`? */
+export function isSameMonth(iso: string, d: Date): boolean {
+  const parsed = parseIso(iso);
+  return parsed.getFullYear() === d.getFullYear() && parsed.getMonth() === d.getMonth();
+}
+
+/** Kurzform für die Tab-Leiste, z.B. "Mo 24." — der Monat steht im Kopf darüber. */
+export function formatTabDate(iso: string): string {
+  return `${formatWeekday(iso)} ${parseIso(iso).getDate()}.`;
+}

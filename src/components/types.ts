@@ -27,6 +27,7 @@ export type SheetState =
   | { type: 'entry'; exId: string; side: Side; index: number; name: string; exType: ExerciseType }
   | { type: 'history' }
   | { type: 'data' }
+  | { type: 'newPlan' }
   | { type: 'addSession'; date: string }
   | { type: 'sessionDetail'; session: PlannedSession }
   | null;

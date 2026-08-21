@@ -1,0 +1,31 @@
+.empty {
+  margin: 48px 22px 0;
+  text-align: center;
+}
+
+.icon {
+  font-size: 34px;
+  color: var(--faint);
+  line-height: 1;
+}
+
+.title {
+  margin: 14px 0 0;
+  font-size: 17px;
+  font-weight: 650;
+}
+
+.text {
+  margin: 8px 0 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--mute);
+}
+
+.solid {
+  composes: solid from '../../styles/shared.module.scss';
+}
+
+.ghost {
+  composes: ghost from '../../styles/shared.module.scss';
+}

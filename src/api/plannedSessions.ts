@@ -1,7 +1,14 @@
-import type { PlannedSession, PlannedSessionStatus, SessionType } from '../types';
+import type { EditScope, PlannedSession, PlannedSessionStatus, SessionType } from '../types';
 import { authorizedFetch } from './base';
 
 const JSON_HEADERS = { 'Content-Type': 'application/json' };
+
+/**
+ * A scope=future write answers 204: it changed every later occurrence of the series, so there is no
+ * single session to return and the caller has to reload the visible range.
+ */
+export const SERIES_CHANGED = 'series-changed';
+export type SeriesChanged = typeof SERIES_CHANGED;
 
 export async function loadSessionTypes(): Promise<SessionType[] | null> {
   try {
@@ -64,6 +71,7 @@ export async function createPlannedSession(input: {
   date: string;
   time?: string;
   sessionTypeId: number;
+  dayId?: string;
   notes?: string;
 }): Promise<PlannedSession | null> {
   try {
@@ -82,8 +90,8 @@ export async function createPlannedSession(input: {
 
 export async function updatePlannedSession(
   id: number,
-  patch: { sessionTypeId: number; notes?: string },
-): Promise<PlannedSession | null> {
+  patch: { sessionTypeId: number; dayId?: string; notes?: string; scope?: EditScope },
+): Promise<PlannedSession | SeriesChanged | null> {
   try {
     const res = await authorizedFetch(`/planned-sessions/${id}`, {
       method: 'PUT',
@@ -91,6 +99,7 @@ export async function updatePlannedSession(
       body: JSON.stringify(patch),
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    if (res.status === 204) return SERIES_CHANGED;
     return (await res.json()) as PlannedSession;
   } catch (err) {
     console.error(err);
@@ -100,8 +109,8 @@ export async function updatePlannedSession(
 
 export async function reschedulePlannedSession(
   id: number,
-  patch: { date: string; time?: string },
-): Promise<PlannedSession | null> {
+  patch: { date: string; time?: string; scope?: EditScope },
+): Promise<PlannedSession | SeriesChanged | null> {
   try {
     const res = await authorizedFetch(`/planned-sessions/${id}/schedule`, {
       method: 'PUT',
@@ -109,6 +118,7 @@ export async function reschedulePlannedSession(
       body: JSON.stringify(patch),
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    if (res.status === 204) return SERIES_CHANGED;
     return (await res.json()) as PlannedSession;
   } catch (err) {
     console.error(err);
@@ -134,9 +144,10 @@ export async function updatePlannedSessionStatus(
   }
 }
 
-export async function deletePlannedSession(id: number): Promise<boolean> {
+export async function deletePlannedSession(id: number, scope?: EditScope): Promise<boolean> {
   try {
-    const res = await authorizedFetch(`/planned-sessions/${id}`, { method: 'DELETE' });
+    const query = scope ? `?scope=${scope}` : '';
+    const res = await authorizedFetch(`/planned-sessions/${id}${query}`, { method: 'DELETE' });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return true;
   } catch (err) {

@@ -1,0 +1,10 @@
+.git/
+.idea/
+.claude/
+node_modules/
+dist/
+dev-dist/
+*.tsbuildinfo
+.DS_Store
+backend/
+docs/

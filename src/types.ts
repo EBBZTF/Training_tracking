@@ -34,7 +34,7 @@ export interface Block {
   ex: Exercise[];
 }
 
-/** A block as rendered for a given day: the hip block is shared across every day. */
+/** A block as rendered for a given day; a shared block is repeated on every day of the plan. */
 export interface BlockView extends Block {
   shared?: boolean;
 }
@@ -49,7 +49,8 @@ export interface Day {
 
 export interface Plan {
   warmup: string[];
-  hip: Block;
+  /** Optional block repeated on every day of the plan; absent unless the user has one. */
+  hip?: Block;
   days: Day[];
 }
 
@@ -68,7 +69,7 @@ export interface AppState {
   logs: Session[];
 }
 
-/** Identifies one block within the plan: either the shared hip block, or the block at `index` on `dayId`. */
+/** Identifies one block within the plan: either the shared block, or the block at `index` on `dayId`. */
 export type BlockRef = { kind: 'hip' } | { kind: 'day'; dayId: string; index: number };
 
 export type Mode = 'log' | 'edit';
@@ -88,7 +89,30 @@ export interface PlannedSession {
   date: string; // YYYY-MM-DD
   time?: string; // HH:mm
   sessionTypeId: number;
-  dayId?: string; // optional link to a structured plan Day; not exposed in v1 UI
+  dayId?: string; // optional link to a structured plan Day, chosen when scheduling
   status: PlannedSessionStatus;
   notes?: string;
+  /** Set when this session is one occurrence of a series; drives the "nur dieser Termin?" prompt. */
+  ruleId?: number;
 }
+
+/** Weekday bit in a weekly rule's mask: Mo=1, Di=2, Mi=4, Do=8, Fr=16, Sa=32, So=64. */
+export type WeekdayMask = number;
+
+export type RecurrencePattern = 'weekly' | 'interval';
+
+export interface RecurringRule {
+  id: number;
+  sessionTypeId: number;
+  dayId?: string;
+  time?: string;
+  notes?: string;
+  pattern: RecurrencePattern;
+  weekdays?: WeekdayMask;
+  intervalDays?: number;
+  startDate: string;
+  endDate?: string;
+}
+
+/** Which occurrences an edit to a series applies to. */
+export type EditScope = 'one' | 'future';

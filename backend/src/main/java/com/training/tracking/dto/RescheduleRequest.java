@@ -4,6 +4,8 @@ import jakarta.validation.constraints.NotBlank;
 
 public record RescheduleRequest(
         @NotBlank String date,
-        String time
+        String time,
+        /** 'one' (default) or 'future'; only meaningful for an occurrence of a series. */
+        String scope
 ) {
 }

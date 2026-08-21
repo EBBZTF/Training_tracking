@@ -40,7 +40,8 @@
     color: var(--faint);
   }
 
-  input {
+  input,
+  select {
     background: var(--panel2);
     border: 1px solid var(--line);
     border-radius: 8px;
@@ -62,6 +63,27 @@
   display: flex;
   gap: 8px;
   margin-top: 14px;
+  align-items: flex-end;
+
+  .field {
+    flex: 1;
+    margin-bottom: 0;
+  }
+}
+
+/* The "nur dieser Termin?" question, asked before an edit touches a series. */
+.scope {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px;
+  margin: 14px 0;
+  background: var(--panel);
+}
+
+.scopeText {
+  font-size: 14px;
+  line-height: 1.45;
+  margin-bottom: 10px;
 }
 
 .mini {

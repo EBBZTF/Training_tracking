@@ -14,4 +14,9 @@ public interface PlannedSessionRepository extends JpaRepository<PlannedSession, 
     Optional<PlannedSession> findByIdAndUserId(Long id, Long userId);
 
     long countBySessionTypeId(Long sessionTypeId);
+
+    /** Occurrences a rule has already materialized in this window, keyed by their original date. */
+    List<PlannedSession> findAllByRule_IdAndOccurrenceDateBetween(Long ruleId, LocalDate from, LocalDate to);
+
+    List<PlannedSession> findAllByRule_IdAndOccurrenceDateGreaterThanEqual(Long ruleId, LocalDate from);
 }

@@ -8,22 +8,30 @@ import type {
   Plan,
   UnilateralExercise,
 } from '../types';
-import { uid } from '../data/defaultPlan';
+import { uid } from '../data/plan';
 
 function newExercise(): BilateralExercise {
   return { id: uid(), name: 'Neue Übung', type: 'kg', uni: false, sets: 3, reps: '8' };
 }
 
-export function curDay(plan: Plan, dayId: string): Day {
-  return plan.days.find((d) => d.id === dayId) ?? plan.days[0];
+/** Undefined when nothing is selected, or the selected plan is gone. */
+export function curDay(plan: Plan, dayId: string): Day | undefined {
+  return plan.days.find((d) => d.id === dayId);
 }
 
-export function allBlocksForDay(plan: Plan, day: Day): BlockView[] {
-  return [{ ...plan.hip, shared: true }, ...day.blocks];
+export function addDay(plan: Plan, day: Day): Plan {
+  return { ...plan, days: [...plan.days, day] };
+}
+
+export function allBlocksForDay(plan: Plan, day: Day | undefined): BlockView[] {
+  if (!day) return [];
+  const shared: BlockView[] = plan.hip ? [{ ...plan.hip, shared: true }] : [];
+  return [...shared, ...day.blocks];
 }
 
 export function findExercise(plan: Plan, id: string): Exercise | null {
-  for (const block of [plan.hip, ...plan.days.flatMap((d) => d.blocks)]) {
+  const blocks = [...(plan.hip ? [plan.hip] : []), ...plan.days.flatMap((d) => d.blocks)];
+  for (const block of blocks) {
     const found = block.ex.find((x) => x.id === id);
     if (found) return found;
   }
@@ -31,7 +39,10 @@ export function findExercise(plan: Plan, id: string): Exercise | null {
 }
 
 export function getBlock(plan: Plan, ref: BlockRef): Block {
-  if (ref.kind === 'hip') return plan.hip;
+  if (ref.kind === 'hip') {
+    if (!plan.hip) throw new Error('Plan has no shared block');
+    return plan.hip;
+  }
   const day = plan.days.find((d) => d.id === ref.dayId);
   const block = day?.blocks[ref.index];
   if (!block) throw new Error(`Unknown block ${ref.index} on day ${ref.dayId}`);
@@ -39,7 +50,7 @@ export function getBlock(plan: Plan, ref: BlockRef): Block {
 }
 
 function withBlock(plan: Plan, ref: BlockRef, updater: (block: Block) => Block): Plan {
-  if (ref.kind === 'hip') return { ...plan, hip: updater(plan.hip) };
+  if (ref.kind === 'hip') return plan.hip ? { ...plan, hip: updater(plan.hip) } : plan;
   return {
     ...plan,
     days: plan.days.map((d) =>

@@ -55,18 +55,23 @@ public class PlannedSessionController {
         return plannedSessionService.create(principal.id(), request);
     }
 
+    /**
+     * 200 with the updated session for a single occurrence; 204 when the change applied to the rest
+     * of a series, because that invalidates every occurrence in the client's visible range.
+     */
     @PutMapping("/{id}")
-    public PlannedSessionDto update(@AuthenticationPrincipal UserPrincipal principal,
-                                     @PathVariable Long id,
-                                     @Valid @RequestBody UpdatePlannedSessionRequest request) {
-        return plannedSessionService.update(principal.id(), id, request);
+    public ResponseEntity<PlannedSessionDto> update(@AuthenticationPrincipal UserPrincipal principal,
+                                                     @PathVariable Long id,
+                                                     @Valid @RequestBody UpdatePlannedSessionRequest request) {
+        return orNoContent(plannedSessionService.update(principal.id(), id, request));
     }
 
+    /** 200 for a single occurrence, 204 when the rest of the series moved — see {@link #update}. */
     @PutMapping("/{id}/schedule")
-    public PlannedSessionDto reschedule(@AuthenticationPrincipal UserPrincipal principal,
-                                         @PathVariable Long id,
-                                         @Valid @RequestBody RescheduleRequest request) {
-        return plannedSessionService.reschedule(principal.id(), id, request);
+    public ResponseEntity<PlannedSessionDto> reschedule(@AuthenticationPrincipal UserPrincipal principal,
+                                                         @PathVariable Long id,
+                                                         @Valid @RequestBody RescheduleRequest request) {
+        return orNoContent(plannedSessionService.reschedule(principal.id(), id, request));
     }
 
     @PutMapping("/{id}/status")
@@ -77,8 +82,14 @@ public class PlannedSessionController {
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> delete(@AuthenticationPrincipal UserPrincipal principal, @PathVariable Long id) {
-        plannedSessionService.delete(principal.id(), id);
+    public ResponseEntity<Void> delete(@AuthenticationPrincipal UserPrincipal principal,
+                                        @PathVariable Long id,
+                                        @RequestParam(required = false) String scope) {
+        plannedSessionService.delete(principal.id(), id, scope);
         return ResponseEntity.noContent().build();
+    }
+
+    private static ResponseEntity<PlannedSessionDto> orNoContent(PlannedSessionDto dto) {
+        return dto == null ? ResponseEntity.noContent().build() : ResponseEntity.ok(dto);
     }
 }

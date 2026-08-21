@@ -37,6 +37,32 @@
 
   &.on {
     color: var(--ink);
-    border-bottom-color: var(--ink);
+    border-bottom-color: var(--k, var(--ink));
+  }
+
+  /* Done or skipped: still selectable so it can be logged, just visually retired. */
+  &.dim b {
+    opacity: 0.5;
+  }
+
+  &.add {
+    flex: 0 0 auto;
+    min-width: 44px;
+    color: var(--faint);
+  }
+
+  /* Month steppers sit at the ends of the strip and carry their full label. */
+  &.month {
+    flex: 0 0 auto;
+    min-width: 0;
+    padding: 10px 12px 12px;
+    color: var(--mute);
+
+    span {
+      white-space: nowrap;
+      text-transform: none;
+      letter-spacing: 0.02em;
+      font-size: 10.5px;
+    }
   }
 }

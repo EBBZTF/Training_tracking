@@ -1,16 +1,13 @@
 package com.training.tracking.service;
 
-import com.training.tracking.domain.Day;
 import com.training.tracking.domain.PlannedSession;
-import com.training.tracking.domain.SessionType;
 import com.training.tracking.dto.CreatePlannedSessionRequest;
 import com.training.tracking.dto.PlannedSessionDto;
 import com.training.tracking.dto.RescheduleRequest;
 import com.training.tracking.dto.UpdatePlannedSessionRequest;
 import com.training.tracking.dto.UpdateStatusRequest;
-import com.training.tracking.repository.DayRepository;
 import com.training.tracking.repository.PlannedSessionRepository;
-import com.training.tracking.repository.SessionTypeRepository;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,22 +24,49 @@ public class PlannedSessionService {
 
     private static final Set<String> VALID_STATUSES = Set.of("planned", "done", "skipped");
 
+    /** Widest window a client may ask for, so a stray range cannot materialize years of occurrences. */
+    private static final long MAX_RANGE_DAYS = 366;
+
     private final PlannedSessionRepository plannedSessionRepository;
-    private final SessionTypeRepository sessionTypeRepository;
-    private final DayRepository dayRepository;
+    private final RecurringRuleService recurringRuleService;
+    private final ScheduleRefs refs;
 
     public PlannedSessionService(PlannedSessionRepository plannedSessionRepository,
-                                  SessionTypeRepository sessionTypeRepository,
-                                  DayRepository dayRepository) {
+                                  RecurringRuleService recurringRuleService,
+                                  ScheduleRefs refs) {
         this.plannedSessionRepository = plannedSessionRepository;
-        this.sessionTypeRepository = sessionTypeRepository;
-        this.dayRepository = dayRepository;
+        this.recurringRuleService = recurringRuleService;
+        this.refs = refs;
     }
 
-    @Transactional(readOnly = true)
+    /** Scope of an edit that lands on an occurrence of a series. */
+    public enum Scope {
+        ONE, FUTURE;
+
+        static Scope of(String raw) {
+            if (raw == null || raw.isBlank() || "one".equals(raw)) {
+                return ONE;
+            }
+            if ("future".equals(raw)) {
+                return FUTURE;
+            }
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "scope must be one or future");
+        }
+    }
+
+    @Transactional
     public List<PlannedSessionDto> listByRange(Long userId, LocalDate from, LocalDate to) {
         if (from.isAfter(to)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "from must not be after to");
+        }
+        if (from.plusDays(MAX_RANGE_DAYS).isBefore(to)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "range must not exceed " + MAX_RANGE_DAYS + " days");
+        }
+        try {
+            recurringRuleService.materialize(userId, from, to);
+        } catch (DataIntegrityViolationException e) {
+            // A concurrent request materialized the same window first; its rows are the ones we read.
         }
         return plannedSessionRepository
                 .findAllByUserIdAndScheduledDateBetweenOrderByScheduledDateAscScheduledTimeAsc(userId, from, to)
@@ -60,10 +84,10 @@ public class PlannedSessionService {
     public PlannedSessionDto create(Long userId, CreatePlannedSessionRequest request) {
         PlannedSession session = new PlannedSession();
         session.setUserId(userId);
-        session.setScheduledDate(parseDate(request.date()));
-        session.setScheduledTime(parseTime(request.time()));
-        session.setSessionType(resolveSessionType(userId, request.sessionTypeId()));
-        session.setDay(resolveDay(userId, request.dayId()));
+        session.setScheduledDate(ScheduleRefs.parseDate(request.date()));
+        session.setScheduledTime(ScheduleRefs.parseTime(request.time()));
+        session.setSessionType(refs.sessionType(userId, request.sessionTypeId()));
+        session.setDayKey(refs.dayKey(userId, request.dayId()));
         session.setNotes(request.notes());
         session.setStatus("planned");
         session.setCreatedAt(Instant.now());
@@ -71,21 +95,39 @@ public class PlannedSessionService {
         return toDto(session);
     }
 
+    /** Null means the change applied to the whole rest of the series — the client must reload the range. */
     @Transactional
     public PlannedSessionDto update(Long userId, Long id, UpdatePlannedSessionRequest request) {
         PlannedSession session = findOwned(userId, id);
-        session.setSessionType(resolveSessionType(userId, request.sessionTypeId()));
-        session.setDay(resolveDay(userId, request.dayId()));
+        var type = refs.sessionType(userId, request.sessionTypeId());
+        String dayKey = refs.dayKey(userId, request.dayId());
+
+        if (appliesToSeries(session, request.scope())) {
+            recurringRuleService.updateSeries(session, type, dayKey, request.notes());
+            return null;
+        }
+        detachIfSeries(session);
+        session.setSessionType(type);
+        session.setDayKey(dayKey);
         session.setNotes(request.notes());
         plannedSessionRepository.save(session);
         return toDto(session);
     }
 
+    /** Null means the whole rest of the series moved — the client must reload the range. */
     @Transactional
     public PlannedSessionDto reschedule(Long userId, Long id, RescheduleRequest request) {
         PlannedSession session = findOwned(userId, id);
-        session.setScheduledDate(parseDate(request.date()));
-        session.setScheduledTime(parseTime(request.time()));
+        LocalDate date = ScheduleRefs.parseDate(request.date());
+        LocalTime time = ScheduleRefs.parseTime(request.time());
+
+        if (appliesToSeries(session, request.scope())) {
+            recurringRuleService.rescheduleSeries(session, date, time);
+            return null;
+        }
+        detachIfSeries(session);
+        session.setScheduledDate(date);
+        session.setScheduledTime(time);
         plannedSessionRepository.save(session);
         return toDto(session);
     }
@@ -102,49 +144,33 @@ public class PlannedSessionService {
     }
 
     @Transactional
-    public void delete(Long userId, Long id) {
-        plannedSessionRepository.delete(findOwned(userId, id));
+    public void delete(Long userId, Long id, String scope) {
+        PlannedSession session = findOwned(userId, id);
+        if (appliesToSeries(session, scope)) {
+            recurringRuleService.endSeriesAt(session);
+            return;
+        }
+        if (session.getRule() != null) {
+            recurringRuleService.deleteOccurrence(session);
+            return;
+        }
+        plannedSessionRepository.delete(session);
+    }
+
+    private static boolean appliesToSeries(PlannedSession session, String scope) {
+        return session.getRule() != null && Scope.of(scope) == Scope.FUTURE;
+    }
+
+    /** Editing a single occurrence takes it out of the series, so the series never restores it. */
+    private void detachIfSeries(PlannedSession session) {
+        if (session.getRule() != null) {
+            recurringRuleService.detachOccurrence(session);
+        }
     }
 
     private PlannedSession findOwned(Long userId, Long id) {
         return plannedSessionRepository.findByIdAndUserId(id, userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "planned session not found"));
-    }
-
-    private SessionType resolveSessionType(Long userId, Long sessionTypeId) {
-        SessionType type = sessionTypeRepository.findById(sessionTypeId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "session type not found"));
-        if (type.getUserId() != null && !type.getUserId().equals(userId)) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "session type not found");
-        }
-        return type;
-    }
-
-    private Day resolveDay(Long userId, String dayId) {
-        if (dayId == null || dayId.isBlank()) {
-            return null;
-        }
-        return dayRepository.findByUserIdAndDayKey(userId, dayId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "unknown day id"));
-    }
-
-    private static LocalDate parseDate(String date) {
-        try {
-            return LocalDate.parse(date);
-        } catch (java.time.format.DateTimeParseException e) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "invalid date");
-        }
-    }
-
-    private static LocalTime parseTime(String time) {
-        if (time == null || time.isBlank()) {
-            return null;
-        }
-        try {
-            return LocalTime.parse(time);
-        } catch (java.time.format.DateTimeParseException e) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "invalid time");
-        }
     }
 
     private static PlannedSessionDto toDto(PlannedSession session) {
@@ -153,8 +179,9 @@ public class PlannedSessionService {
                 session.getScheduledDate().toString(),
                 session.getScheduledTime() == null ? null : session.getScheduledTime().toString(),
                 session.getSessionType().getId(),
-                session.getDay() == null ? null : session.getDay().getDayKey(),
+                session.getDayKey(),
                 session.getStatus(),
-                session.getNotes());
+                session.getNotes(),
+                session.getRule() == null ? null : session.getRule().getId());
     }
 }

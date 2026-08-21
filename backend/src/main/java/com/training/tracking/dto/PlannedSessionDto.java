@@ -7,6 +7,8 @@ public record PlannedSessionDto(
         Long sessionTypeId,
         String dayId,
         String status,
-        String notes
+        String notes,
+        /** Set when this session is an occurrence of a series; drives the scope prompt in the UI. */
+        Long ruleId
 ) {
 }
