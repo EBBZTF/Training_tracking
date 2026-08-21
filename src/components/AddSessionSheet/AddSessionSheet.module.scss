@@ -1,0 +1,103 @@
+.title {
+  composes: h2 from '../Sheet/Sheet.module.scss';
+}
+
+.sub {
+  composes: sub from '../Sheet/Sheet.module.scss';
+}
+
+.solid {
+  composes: solid from '../../styles/shared.module.scss';
+
+  &:disabled {
+    opacity: 0.5;
+  }
+}
+
+.ghost {
+  composes: ghost from '../../styles/shared.module.scss';
+
+  &:disabled {
+    opacity: 0.5;
+  }
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 12px;
+
+  label {
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--faint);
+  }
+
+  input,
+  textarea {
+    background: var(--panel2);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 9px 10px;
+    font-size: 15px;
+    width: 100%;
+  }
+
+  input[type='color'] {
+    padding: 3px;
+    height: 40px;
+  }
+
+  textarea {
+    resize: vertical;
+    line-height: 1.5;
+    font-size: 14px;
+  }
+
+  &.grow {
+    flex: 1;
+  }
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.chip {
+  padding: 8px 12px;
+  border-radius: 20px;
+  border: 1px solid var(--line);
+  font-size: 13.5px;
+  color: var(--ink);
+  background: var(--panel);
+
+  &.chipOn {
+    background: var(--k, var(--panel2));
+    border-color: var(--k, var(--line));
+    color: var(--bg);
+    font-weight: 650;
+  }
+
+  &.chipAdd {
+    color: var(--mute);
+    border-style: dashed;
+    background: transparent;
+  }
+}
+
+.newType {
+  border: 1px dashed var(--line);
+  border-radius: 12px;
+  padding: 12px;
+  margin-bottom: 12px;
+  background: var(--panel);
+}
+
+.newTypeRow {
+  display: flex;
+  gap: 8px;
+}

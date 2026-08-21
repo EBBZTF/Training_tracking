@@ -1,0 +1,111 @@
+.calendar {
+  padding: 14px 12px 24px;
+}
+
+.nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.navBtn {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--panel);
+  color: var(--ink);
+  font-size: 18px;
+}
+
+.label {
+  font-size: 16px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  text-transform: capitalize;
+}
+
+.today {
+  display: block;
+  margin: 8px auto 0;
+  padding: 6px 14px;
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--mute);
+  font-size: 12.5px;
+}
+
+.weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  margin-top: 16px;
+}
+
+.weekday {
+  text-align: center;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--faint);
+  padding-bottom: 6px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+
+.cell {
+  min-height: 64px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 5px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  background: var(--panel);
+  text-align: left;
+  align-items: stretch;
+  cursor: pointer;
+
+  &.dim {
+    opacity: 0.4;
+  }
+
+  &.today2 {
+    border-color: var(--ink);
+  }
+}
+
+.daynum {
+  font-size: 12px;
+  font-family: var(--num);
+  color: var(--mute);
+}
+
+.pills {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.pill {
+  display: block;
+  width: 100%;
+  padding: 2px 5px;
+  border-radius: 5px;
+  background: var(--k, var(--faint));
+  color: var(--bg);
+  font-size: 10px;
+  font-weight: 600;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+
+  &.pillDone {
+    opacity: 0.55;
+    text-decoration: line-through;
+  }
+}

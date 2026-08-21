@@ -1,4 +1,4 @@
-import type { BlockRef, ExerciseType, Side } from '../types';
+import type { BlockRef, ExerciseType, PlannedSession, Side } from '../types';
 
 export interface ExerciseActions {
   addExercise: (ref: BlockRef) => void;
@@ -27,4 +27,6 @@ export type SheetState =
   | { type: 'entry'; exId: string; side: Side; index: number; name: string; exType: ExerciseType }
   | { type: 'history' }
   | { type: 'data' }
+  | { type: 'addSession'; date: string }
+  | { type: 'sessionDetail'; session: PlannedSession }
   | null;

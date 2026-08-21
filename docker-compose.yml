@@ -17,6 +17,7 @@ services:
 
   backend:
     build: ./backend
+    restart: on-failure:5
     environment:
       DB_HOST: postgres
       DB_PORT: 5432
@@ -29,6 +30,14 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+
+  frontend:
+    build: .
+    restart: on-failure:5
+    ports:
+      - "5500:80"
+    depends_on:
+      - backend
 
 volumes:
   postgres-data:

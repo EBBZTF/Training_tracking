@@ -1,0 +1,80 @@
+.title {
+  composes: h2 from '../Sheet/Sheet.module.scss';
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--k, var(--faint));
+}
+
+.sub {
+  composes: sub from '../Sheet/Sheet.module.scss';
+}
+
+.notes {
+  background: var(--panel);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 14px;
+  color: var(--mute);
+  margin-bottom: 14px;
+  white-space: pre-wrap;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 10px;
+
+  label {
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--faint);
+  }
+
+  input {
+    background: var(--panel2);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 9px 10px;
+    font-size: 15px;
+    width: 100%;
+  }
+}
+
+.ghost {
+  composes: ghost from '../../styles/shared.module.scss';
+
+  &:disabled {
+    opacity: 0.5;
+  }
+}
+
+.row {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.mini {
+  flex: 1;
+  font-size: 13px;
+  padding: 11px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  color: var(--mute);
+  text-align: center;
+}
+
+.danger {
+  composes: ghost from '../../styles/shared.module.scss';
+  color: var(--kraft);
+}

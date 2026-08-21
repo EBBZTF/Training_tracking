@@ -72,3 +72,23 @@ export interface AppState {
 export type BlockRef = { kind: 'hip' } | { kind: 'day'; dayId: string; index: number };
 
 export type Mode = 'log' | 'edit';
+
+export type PlannedSessionStatus = 'planned' | 'done' | 'skipped';
+
+export interface SessionType {
+  id: number;
+  label: string;
+  color?: string;
+  icon?: string;
+  custom: boolean; // true = user-created, false = seeded default (no delete/edit affordance for false)
+}
+
+export interface PlannedSession {
+  id: number;
+  date: string; // YYYY-MM-DD
+  time?: string; // HH:mm
+  sessionTypeId: number;
+  dayId?: string; // optional link to a structured plan Day; not exposed in v1 UI
+  status: PlannedSessionStatus;
+  notes?: string;
+}
