@@ -3,6 +3,8 @@ package com.training.tracking.domain;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
@@ -13,8 +15,12 @@ import jakarta.persistence.Table;
 public class Exercise {
 
     @Id
-    @Column(length = 32)
-    private String id;
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    /** The client-generated uid, unique within its block rather than globally. */
+    @Column(name = "client_id", nullable = false, length = 32)
+    private String clientId;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "block_id", nullable = false)
@@ -49,8 +55,11 @@ public class Exercise {
     @Column(nullable = false)
     private int position;
 
-    public String getId() { return id; }
-    public void setId(String id) { this.id = id; }
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
+
+    public String getClientId() { return clientId; }
+    public void setClientId(String clientId) { this.clientId = clientId; }
 
     public Block getBlock() { return block; }
     public void setBlock(Block block) { this.block = block; }

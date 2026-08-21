@@ -5,6 +5,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
 
-public interface ExerciseRepository extends JpaRepository<Exercise, String> {
-    List<Exercise> findAllByOrderByPosition();
+public interface ExerciseRepository extends JpaRepository<Exercise, Long> {
+    List<Exercise> findAllByBlock_UserIdOrderByPosition(Long userId);
 }

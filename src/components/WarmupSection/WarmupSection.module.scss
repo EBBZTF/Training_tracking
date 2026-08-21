@@ -65,3 +65,40 @@
   border-radius: 6px;
   border: 1.5px solid var(--faint);
 }
+
+.wedit {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 0;
+  border-top: 1px solid var(--line);
+
+  input {
+    flex: 1;
+    background: var(--panel2);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 8px 9px;
+    font-size: 14px;
+    min-width: 0;
+  }
+}
+
+.mini {
+  flex: none;
+  font-size: 12.5px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  color: var(--mute);
+
+  &.danger {
+    color: var(--kraft);
+    border-color: #4a2a28;
+  }
+}
+
+.addbtn {
+  composes: addbtn from '../../styles/shared.module.scss';
+  margin-top: 6px;
+}

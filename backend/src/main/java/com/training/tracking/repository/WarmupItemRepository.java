@@ -5,6 +5,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
 
-public interface WarmupItemRepository extends JpaRepository<WarmupItem, Integer> {
-    List<WarmupItem> findAllByOrderByPosition();
+public interface WarmupItemRepository extends JpaRepository<WarmupItem, Long> {
+    List<WarmupItem> findAllByUserIdOrderByPosition(Long userId);
 }

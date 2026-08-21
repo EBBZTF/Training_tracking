@@ -15,6 +15,13 @@ export interface ExerciseActions {
   setSets: (ref: BlockRef, exId: string, field: 'sets' | 'setsL' | 'setsR', value: number) => void;
 }
 
+export interface WarmupActions {
+  addWarmupItem: () => void;
+  deleteWarmupItem: (index: number) => void;
+  moveWarmupItem: (index: number, dir: -1 | 1) => void;
+  setWarmupText: (index: number, value: string) => void;
+}
+
 export type SheetState =
   | { type: 'info'; exId: string }
   | { type: 'entry'; exId: string; side: Side; index: number; name: string; exType: ExerciseType }

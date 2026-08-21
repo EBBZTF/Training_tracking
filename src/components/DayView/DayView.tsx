@@ -2,7 +2,7 @@ import type { BlockRef, BlockView, Day, ExerciseType, Mode, Session, Side } from
 import { DayHeader } from '../DayHeader/DayHeader';
 import { WarmupSection } from '../WarmupSection/WarmupSection';
 import { BlockSection } from '../BlockSection/BlockSection';
-import type { ExerciseActions } from '../types';
+import type { ExerciseActions, WarmupActions } from '../types';
 import styles from './DayView.module.scss';
 
 interface DayViewProps {
@@ -14,6 +14,7 @@ interface DayViewProps {
   warmOpen: boolean;
   onToggleWarmOpen: () => void;
   onToggleWarmupItem: (index: number) => void;
+  warmupActions: WarmupActions;
   getVal: (exId: string, side: Side, i: number) => string;
   lastVal: (exId: string, side: Side, i: number) => string;
   onOpenInfo: (exId: string) => void;
@@ -36,6 +37,7 @@ export function DayView({
   warmOpen,
   onToggleWarmOpen,
   onToggleWarmupItem,
+  warmupActions,
   getVal,
   lastVal,
   onOpenInfo,
@@ -49,15 +51,15 @@ export function DayView({
     <>
       <DayHeader day={day} />
 
-      {!editing && (
-        <WarmupSection
-          items={warmup}
-          session={session}
-          open={warmOpen}
-          onToggleOpen={onToggleWarmOpen}
-          onToggleItem={onToggleWarmupItem}
-        />
-      )}
+      <WarmupSection
+        items={warmup}
+        session={session}
+        open={warmOpen}
+        editing={editing}
+        onToggleOpen={onToggleWarmOpen}
+        onToggleItem={onToggleWarmupItem}
+        actions={warmupActions}
+      />
 
       {blocks.map((block) => (
         <BlockSection

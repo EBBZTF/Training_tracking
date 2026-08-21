@@ -2,16 +2,26 @@ package com.training.tracking.domain;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 
 @Entity
-@Table(name = "days")
+@Table(name = "days", uniqueConstraints = @UniqueConstraint(columnNames = {"user_id", "day_key"}))
 public class Day {
 
     @Id
-    @Column(length = 16)
-    private String id;
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(name = "user_id", nullable = false)
+    private Long userId;
+
+    /** The client-facing id ("mo", "tu", ...), unique per user rather than globally. */
+    @Column(name = "day_key", nullable = false, length = 16)
+    private String dayKey;
 
     @Column(name = "short_label", nullable = false, length = 32)
     private String shortLabel;
@@ -25,8 +35,14 @@ public class Day {
     @Column(nullable = false)
     private int position;
 
-    public String getId() { return id; }
-    public void setId(String id) { this.id = id; }
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
+
+    public Long getUserId() { return userId; }
+    public void setUserId(Long userId) { this.userId = userId; }
+
+    public String getDayKey() { return dayKey; }
+    public void setDayKey(String dayKey) { this.dayKey = dayKey; }
 
     public String getShortLabel() { return shortLabel; }
     public void setShortLabel(String shortLabel) { this.shortLabel = shortLabel; }

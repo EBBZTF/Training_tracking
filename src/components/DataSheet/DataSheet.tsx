@@ -9,6 +9,8 @@ interface DataSheetProps {
   onImport: (data: AppState) => void;
   onReset: () => void;
   notify: (message: string) => void;
+  userEmail: string;
+  onLogout: () => void;
 }
 
 function isAppState(value: unknown): value is AppState {
@@ -17,7 +19,7 @@ function isAppState(value: unknown): value is AppState {
   return !!v.plan && Array.isArray(v.logs);
 }
 
-export function DataSheet({ state, today, onImport, onReset, notify }: DataSheetProps) {
+export function DataSheet({ state, today, onImport, onReset, notify, userEmail, onLogout }: DataSheetProps) {
   const fileRef = useRef<HTMLInputElement>(null);
 
   const handleExport = () => {
@@ -71,6 +73,13 @@ export function DataSheet({ state, today, onImport, onReset, notify }: DataSheet
       <button type="button" className={styles.reset} onClick={handleReset}>
         Plan auf Ausgangsversion zurücksetzen
       </button>
+
+      <h2 className={styles.title}>Konto</h2>
+      <div className={styles.sub}>Angemeldet als {userEmail}</div>
+      <button type="button" className={styles.ghost} onClick={onLogout}>
+        Abmelden
+      </button>
+
       <input
         ref={fileRef}
         type="file"

@@ -9,13 +9,13 @@ import java.util.Objects;
 public class SessionValueId implements Serializable {
 
     private Long sessionId;
-    private String exerciseId;
+    private Long exerciseId;
     private String side;
     private Integer setIndex;
 
     public SessionValueId() { }
 
-    public SessionValueId(Long sessionId, String exerciseId, String side, Integer setIndex) {
+    public SessionValueId(Long sessionId, Long exerciseId, String side, Integer setIndex) {
         this.sessionId = sessionId;
         this.exerciseId = exerciseId;
         this.side = side;
@@ -25,8 +25,8 @@ public class SessionValueId implements Serializable {
     public Long getSessionId() { return sessionId; }
     public void setSessionId(Long sessionId) { this.sessionId = sessionId; }
 
-    public String getExerciseId() { return exerciseId; }
-    public void setExerciseId(String exerciseId) { this.exerciseId = exerciseId; }
+    public Long getExerciseId() { return exerciseId; }
+    public void setExerciseId(Long exerciseId) { this.exerciseId = exerciseId; }
 
     public String getSide() { return side; }
     public void setSide(String side) { this.side = side; }

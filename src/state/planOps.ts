@@ -144,3 +144,24 @@ export function setExerciseSets(
     ex: b.ex.map((x) => (x.id === exId ? ({ ...x, [field]: clamped } as Exercise) : x)),
   }));
 }
+
+export function addWarmupItem(plan: Plan): Plan {
+  return { ...plan, warmup: [...plan.warmup, 'Neuer Punkt'] };
+}
+
+export function deleteWarmupItem(plan: Plan, index: number): Plan {
+  return { ...plan, warmup: plan.warmup.filter((_, i) => i !== index) };
+}
+
+export function moveWarmupItem(plan: Plan, index: number, dir: -1 | 1): Plan {
+  const target = index + dir;
+  if (target < 0 || target >= plan.warmup.length) return plan;
+  const warmup = [...plan.warmup];
+  const [item] = warmup.splice(index, 1);
+  warmup.splice(target, 0, item);
+  return { ...plan, warmup };
+}
+
+export function setWarmupText(plan: Plan, index: number, value: string): Plan {
+  return { ...plan, warmup: plan.warmup.map((w, i) => (i === index ? value : w)) };
+}

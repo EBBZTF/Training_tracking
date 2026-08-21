@@ -8,12 +8,23 @@ import { EntrySheet } from './components/EntrySheet/EntrySheet';
 import { HistorySheet } from './components/HistorySheet/HistorySheet';
 import { DataSheet } from './components/DataSheet/DataSheet';
 import { Toast } from './components/Toast/Toast';
+import { AuthScreen } from './components/AuthScreen/AuthScreen';
 import type { SheetState } from './components/types';
 import { useTrainingState } from './hooks/useTrainingState';
 import { useToast } from './hooks/useToast';
+import { useAuth } from './auth/AuthContext';
 import type { ExerciseType, Mode, Side } from './types';
 
 export function App() {
+  const { status, user, logout } = useAuth();
+
+  if (status === 'loading') return null;
+  if (status === 'anonymous') return <AuthScreen />;
+
+  return <TrainingApp userEmail={user?.email ?? ''} onLogout={logout} />;
+}
+
+function TrainingApp({ userEmail, onLogout }: { userEmail: string; onLogout: () => void }) {
   const toast = useToast();
   const t = useTrainingState(toast.show);
   const [sheet, setSheet] = useState<SheetState>(null);
@@ -43,6 +54,13 @@ export function App() {
     setSets: t.setExerciseSets,
   };
 
+  const warmupActions = {
+    addWarmupItem: t.addWarmupItem,
+    deleteWarmupItem: t.deleteWarmupItem,
+    moveWarmupItem: t.moveWarmupItem,
+    setWarmupText: t.setWarmupText,
+  };
+
   const closeSheet = () => setSheet(null);
 
   return (
@@ -65,6 +83,7 @@ export function App() {
           warmOpen={t.open === 'warm'}
           onToggleWarmOpen={() => t.setOpen(t.open === 'warm' ? null : 'warm')}
           onToggleWarmupItem={t.toggleWarmupItem}
+          warmupActions={warmupActions}
           getVal={t.getVal}
           lastVal={t.lastVal}
           onOpenInfo={(exId) => setSheet({ type: 'info', exId })}
@@ -124,6 +143,8 @@ export function App() {
                 closeSheet();
               }}
               notify={toast.show}
+              userEmail={userEmail}
+              onLogout={onLogout}
             />
           )}
         </Sheet>

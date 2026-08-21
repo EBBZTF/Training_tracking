@@ -17,21 +17,6 @@ export function useTrainingState(notify: (message: string) => void) {
   const [open, setOpen] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      const data = await loadState();
-      if (cancelled) return;
-      if (data) setState({ plan: attachDesc(data.plan), logs: data.logs });
-      else notify('Laden fehlgeschlagen — Backend erreichbar?');
-      setReady(true);
-    })();
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   const persist = useCallback(
     async (next: AppState) => {
       const ok = await saveState(next);
@@ -39,6 +24,29 @@ export function useTrainingState(notify: (message: string) => void) {
     },
     [notify],
   );
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const data = await loadState();
+      if (cancelled) return;
+      if (data && data.plan) {
+        setState({ plan: attachDesc(data.plan), logs: data.logs });
+      } else if (data) {
+        // Brand-new user: no plan saved yet, seed the default one.
+        const next = { plan: attachDesc(defaultPlan()), logs: data.logs };
+        setState(next);
+        void persist(next);
+      } else {
+        notify('Laden fehlgeschlagen — Backend erreichbar?');
+      }
+      setReady(true);
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [persist]);
 
   const updatePlan = useCallback(
     (updater: (p: AppState['plan']) => AppState['plan']) => {
@@ -110,6 +118,22 @@ export function useTrainingState(notify: (message: string) => void) {
       updatePlan((p) => planOps.setExerciseSets(p, ref, exId, field, value)),
     [updatePlan],
   );
+  const addWarmupItem = useCallback(
+    () => updatePlan((p) => planOps.addWarmupItem(p)),
+    [updatePlan],
+  );
+  const deleteWarmupItem = useCallback(
+    (index: number) => updatePlan((p) => planOps.deleteWarmupItem(p, index)),
+    [updatePlan],
+  );
+  const moveWarmupItem = useCallback(
+    (index: number, dir: -1 | 1) => updatePlan((p) => planOps.moveWarmupItem(p, index, dir)),
+    [updatePlan],
+  );
+  const setWarmupText = useCallback(
+    (index: number, value: string) => updatePlan((p) => planOps.setWarmupText(p, index, value)),
+    [updatePlan],
+  );
 
   const setVal = useCallback(
     (exId: string, side: Side, i: number, value: string) =>
@@ -162,6 +186,10 @@ export function useTrainingState(notify: (message: string) => void) {
     setExerciseType,
     setExerciseText,
     setExerciseSets,
+    addWarmupItem,
+    deleteWarmupItem,
+    moveWarmupItem,
+    setWarmupText,
     resetPlan,
     importState,
   };

@@ -14,12 +14,15 @@ import jakarta.persistence.UniqueConstraint;
 import java.time.LocalDate;
 
 @Entity
-@Table(name = "sessions", uniqueConstraints = @UniqueConstraint(columnNames = {"session_date", "day_id"}))
+@Table(name = "sessions", uniqueConstraints = @UniqueConstraint(columnNames = {"user_id", "session_date", "day_id"}))
 public class Session {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @Column(name = "user_id", nullable = false)
+    private Long userId;
 
     @Column(name = "session_date", nullable = false)
     private LocalDate sessionDate;
@@ -30,6 +33,9 @@ public class Session {
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
+
+    public Long getUserId() { return userId; }
+    public void setUserId(Long userId) { this.userId = userId; }
 
     public LocalDate getSessionDate() { return sessionDate; }
     public void setSessionDate(LocalDate sessionDate) { this.sessionDate = sessionDate; }
