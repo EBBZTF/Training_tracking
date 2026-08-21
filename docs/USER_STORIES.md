@@ -157,6 +157,12 @@ already generated before it keep the old pattern.
 - Editing, moving or deleting an occurrence of a series prompts:
   **"Nur dieser Termin"** / **"Alle künftigen Termine"**.
 - "Nur dieser Termin" writes an exception, so the series is otherwise untouched.
+- "Alle künftigen Termine" reaches the *end of the series*, not merely the next earlier edit: the
+  rules a series was split into are chained by `series_id` (V8), and the half taking over from a
+  date makes the later halves step aside. Without the chain, a second edit made on an earlier half
+  produced a rule overlapping its own successors — two sessions on every date after the older
+  split — which also made it impossible to switch a once-edited series to per-weekday or rotating
+  plans.
 - Deleting a single occurrence hides exactly that date, permanently, and survives a reload.
 - Deleting all future occurrences ends the series at that date; past occurrences and their logged
   data remain.
@@ -420,6 +426,9 @@ What the neighbours do, and what this app should take from them.
    occurrence never reshuffles the cycle; `rotation_offset` is what lets a split half carry on
    mid-cycle. `rotation=hold|shift` on skip and single-occurrence delete, and
    `GET`/`PUT /api/recurring-rules/{id}` for editing the series itself.
+8. **Series are chains** (US-2.7) — V8: `series_id` on `recurring_rules`, and one invariant enforced
+   in `splitAt`/`endSeriesAt`: at most one half of a series generates any given date. Halves that
+   were already split apart before V8 stay separate series; nothing recorded what they belonged to.
 
 ## Still open
 

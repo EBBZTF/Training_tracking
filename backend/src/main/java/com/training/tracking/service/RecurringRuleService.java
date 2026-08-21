@@ -97,12 +97,6 @@ public class RecurringRuleService {
         LocalDate from = request.from() == null || request.from().isBlank()
                 ? LocalDate.now()
                 : ScheduleRefs.parseDate(request.from());
-        // Past its end this rule generates nothing, so redefining it from there would not change the
-        // calendar — it would add a second series next to whatever took over.
-        if (rule.getEndDate() != null && from.isAfter(rule.getEndDate())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "series already ends before " + from);
-        }
         RecurringRule tail = splitAt(rule, from);
         applyDefinition(userId, tail, request);
         // The plans below are a freshly stated cycle, so it starts at its own first step.
@@ -222,15 +216,9 @@ public class RecurringRuleService {
     public void endSeriesAt(PlannedSession occurrence) {
         RecurringRule rule = occurrence.getRule();
         LocalDate from = occurrence.getOccurrenceDate();
-        dropPlannedFrom(rule, from);
-        if (from.isAfter(rule.getStartDate())) {
-            rule.setEndDate(from.minusDays(1));
-            ruleRepository.save(rule);
-        } else {
-            // Nothing of the series predates this occurrence, so the whole rule goes. Occurrences
-            // already logged keep their row; the FK drops their rule_id.
-            ruleRepository.delete(rule);
-        }
+        // Nobody takes over, so every half of the series stops before this date — including this
+        // one, which is deleted outright if nothing of it predates the occurrence.
+        yieldFrom(rule, from, null);
     }
 
     public long countBySessionTypeId(Long sessionTypeId) {
@@ -245,12 +233,15 @@ public class RecurringRuleService {
     private RecurringRule splitAt(RecurringRule rule, LocalDate from) {
         dropPlannedFrom(rule, from);
         if (!from.isAfter(rule.getStartDate())) {
+            // The whole rule is what gets redefined, so it is the half that takes over from here.
+            yieldFrom(rule, from, rule);
             return rule;
         }
 
         List<RecurringRulePlan> plans = plansOf(rule);
         RecurringRule tail = new RecurringRule();
         tail.setUserId(rule.getUserId());
+        tail.setSeriesId(rule.getSeriesId());
         tail.setSessionType(rule.getSessionType());
         tail.setDayKey(rule.getDayKey());
         tail.setScheduledTime(rule.getScheduledTime());
@@ -272,17 +263,48 @@ public class RecurringRuleService {
             planRepository.save(new RecurringRulePlan(tail, plan.getPosition(), plan.getDayKey()));
         }
 
-        // Skipped dates from here on belong to the new half of the series.
-        List<LocalDate> moved = exceptionRepository.findExcludedDates(rule.getId(), from, FAR_FUTURE);
-        for (LocalDate date : moved) {
-            exceptionRepository.delete(new RecurringRuleException(rule, date));
-            exceptionRepository.save(new RecurringRuleException(tail, date));
-        }
-
-        // Only ever shortens: a half that already ended earlier must not be revived by a later split.
-        rule.setEndDate(earlierOf(rule.getEndDate(), from.minusDays(1)));
-        ruleRepository.save(rule);
+        yieldFrom(rule, from, tail);
         return tail;
+    }
+
+    /**
+     * Hands every date from `from` onwards to `takingOver`: the halves of the series that still reach
+     * into that stretch stop before it, and the ones that lie entirely inside it go. Without this a
+     * series edited twice would have two halves generating the same dates — the calendar showing each
+     * session twice — because an edit only ever knows about the half it was made on.
+     *
+     * @param takingOver the half that owns those dates from now on, or null when the series is giving
+     *                   them up for good
+     */
+    private void yieldFrom(RecurringRule rule, LocalDate from, RecurringRule takingOver) {
+        List<RecurringRule> members = ruleRepository.findSeriesMembersFrom(
+                rule.getUserId(), rule.getSeriesId(), from);
+        for (RecurringRule member : members) {
+            if (takingOver != null && member.getId().equals(takingOver.getId())) {
+                continue;
+            }
+            dropPlannedFrom(member, from);
+            if (takingOver != null) {
+                // Dates the user struck out stay struck out, so they move to the half taking over.
+                moveExceptions(member, takingOver, from);
+            }
+            if (member.getStartDate().isBefore(from)) {
+                // Only ever shortens: a half that already ended earlier must not be revived.
+                member.setEndDate(earlierOf(member.getEndDate(), from.minusDays(1)));
+                ruleRepository.save(member);
+            } else {
+                // Nothing of this half predates the takeover. Occurrences already logged keep their
+                // row; the FK drops their rule_id.
+                ruleRepository.delete(member);
+            }
+        }
+    }
+
+    private void moveExceptions(RecurringRule source, RecurringRule target, LocalDate from) {
+        for (LocalDate date : exceptionRepository.findExcludedDates(source.getId(), from, FAR_FUTURE)) {
+            exceptionRepository.delete(new RecurringRuleException(source, date));
+            exceptionRepository.save(new RecurringRuleException(target, date));
+        }
     }
 
     /**

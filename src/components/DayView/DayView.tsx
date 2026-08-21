@@ -21,6 +21,8 @@ interface DayViewProps {
   actions: ExerciseActions;
   blockActions: BlockActions;
   onEditPlan: () => void;
+  /** Opens the session behind this view; absent in edit mode, where no session is being shown. */
+  onOpenSession?: () => void;
 }
 
 /** A block's identity within the plan is its position on its day, which is also its React key. */
@@ -44,6 +46,7 @@ export function DayView({
   actions,
   blockActions,
   onEditPlan,
+  onOpenSession,
 }: DayViewProps) {
   const editing = mode === 'edit';
 
@@ -55,6 +58,16 @@ export function DayView({
         <div className={styles.planRow}>
           <button type="button" className={styles.planEdit} onClick={onEditPlan}>
             Plan bearbeiten
+          </button>
+        </div>
+      )}
+
+      {/* Without this the only way back to the appointment — its date, its plan, its series — is
+          the calendar, because attaching a plan replaces the session view with this one. */}
+      {!editing && onOpenSession && (
+        <div className={styles.planRow}>
+          <button type="button" className={styles.planEdit} onClick={onOpenSession}>
+            Termin bearbeiten
           </button>
         </div>
       )}

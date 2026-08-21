@@ -205,6 +205,11 @@ function TrainingApp({ userEmail, onLogout }: { userEmail: string; onLogout: () 
             actions={exerciseActions}
             blockActions={blockActions}
             onEditPlan={() => t.day && setSheet({ type: 'editPlan', day: t.day })}
+            onOpenSession={
+              mode === 'log' && activeSession
+                ? () => setSheet({ type: 'sessionDetail', session: activeSession })
+                : undefined
+            }
           />
         ) : activeSession && mode === 'log' ? (
           <PlainSession

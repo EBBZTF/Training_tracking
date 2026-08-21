@@ -36,6 +36,14 @@ public class RecurringRule {
     @Column(name = "user_id", nullable = false)
     private Long userId;
 
+    /**
+     * The chain of rules this one belongs to — the id of the rule the series started as. Splitting a
+     * series leaves two rows behind, and they have to know they are halves of the same thing, so that
+     * an edit "ab hier" can make every half after it step aside. Null means this rule is its own head.
+     */
+    @Column(name = "series_id")
+    private Long seriesId;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "session_type_id", nullable = false)
     private SessionType sessionType;
@@ -87,6 +95,10 @@ public class RecurringRule {
 
     public Long getUserId() { return userId; }
     public void setUserId(Long userId) { this.userId = userId; }
+
+    /** A rule with no chain recorded is the head of its own, so this never reads as null. */
+    public Long getSeriesId() { return seriesId != null ? seriesId : id; }
+    public void setSeriesId(Long seriesId) { this.seriesId = seriesId; }
 
     public SessionType getSessionType() { return sessionType; }
     public void setSessionType(SessionType sessionType) { this.sessionType = sessionType; }
