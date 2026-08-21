@@ -10,26 +10,26 @@ import { HistorySheet } from './components/HistorySheet/HistorySheet';
 import { DataSheet } from './components/DataSheet/DataSheet';
 import { AddSessionSheet } from './components/AddSessionSheet/AddSessionSheet';
 import { SessionDetailSheet } from './components/SessionDetailSheet/SessionDetailSheet';
-import { NewPlanSheet } from './components/NewPlanSheet/NewPlanSheet';
+import { PlanSheet } from './components/PlanSheet/PlanSheet';
 import { EmptyTraining } from './components/EmptyTraining/EmptyTraining';
 import { Onboarding } from './components/Onboarding/Onboarding';
 import { Toast } from './components/Toast/Toast';
 import { AuthScreen } from './components/AuthScreen/AuthScreen';
-import type { SheetState } from './components/types';
+import { PlainSession } from './components/PlainSession/PlainSession';
+import type { SheetState } from './components/Sheet/sheetState';
 import { useTrainingState } from './hooks/useTrainingState';
 import { usePlannedSessions } from './hooks/usePlannedSessions';
 import { useToast } from './hooks/useToast';
-import { useAuth } from './auth/AuthContext';
-import { PlainSession } from './components/PlainSession/PlainSession';
+import { useAuth } from './auth/useAuth';
 import type { TabItem } from './components/Tabs/Tabs';
 import type { ExerciseType, Mode, PlannedSession, Side } from './types';
 import {
   addMonths,
   formatMonthLabel,
   formatTabDate,
-  isoDate,
   isSameMonth,
   monthRange,
+  today,
 } from './utils/date';
 import { isOnboarded, markOnboarded } from './utils/onboarding';
 
@@ -56,26 +56,26 @@ function TrainingApp({ userEmail, onLogout }: { userEmail: string; onLogout: () 
   const [introDone, setIntroDone] = useState(false);
   const [introForced, setIntroForced] = useState(false);
 
-  const today = isoDate(new Date());
+  const currentDate = today();
+  const { setVisibleRange } = sessions;
 
   // Only the sessions of the month on screen, in the order they happen.
   const monthSessions = sessions.sessions
     .filter((s) => isSameMonth(s.date, month))
-    .slice()
     .sort((a, b) => a.date.localeCompare(b.date) || (a.time ?? '').localeCompare(b.time ?? ''));
 
   // Nothing picked yet: today's session, else the next one coming up, else the last one.
   const activeSession: PlannedSession | undefined =
     monthSessions.find((s) => s.id === selectedSessionId) ??
-    monthSessions.find((s) => s.date === today) ??
-    monthSessions.find((s) => s.date > today) ??
+    monthSessions.find((s) => s.date === currentDate) ??
+    monthSessions.find((s) => s.date > currentDate) ??
     monthSessions[monthSessions.length - 1];
 
   const t = useTrainingState(
     toast.show,
     mode === 'edit'
-      ? { date: today, dayId: editDayId }
-      : { date: activeSession?.date ?? today, dayId: activeSession?.dayId ?? '' },
+      ? { date: currentDate, dayId: editDayId }
+      : { date: activeSession?.date ?? currentDate, dayId: activeSession?.dayId ?? '' },
   );
 
   // A brand-new account has nothing to look at, so the introduction opens by itself — once.
@@ -91,9 +91,8 @@ function TrainingApp({ userEmail, onLogout }: { userEmail: string; onLogout: () 
 
   useEffect(() => {
     const { from, to } = monthRange(month);
-    sessions.setVisibleRange(from, to);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [month]);
+    setVisibleRange(from, to);
+  }, [month, setVisibleRange]);
 
   if (!t.ready) return null;
 
@@ -101,7 +100,7 @@ function TrainingApp({ userEmail, onLogout }: { userEmail: string; onLogout: () 
 
   const tabItems: TabItem[] =
     mode === 'edit'
-      ? t.plan.days.map((d) => ({ id: d.id, top: d.short, bottom: d.slot ?? '' }))
+      ? t.plan.days.map((d) => ({ id: d.id, top: d.short, bottom: d.title }))
       : monthSessions.map((s) => {
           const type = typeById.get(s.sessionTypeId);
           const day = t.plan.days.find((d) => d.id === s.dayId);
@@ -136,7 +135,7 @@ function TrainingApp({ userEmail, onLogout }: { userEmail: string; onLogout: () 
   const openEntry = (exId: string, side: Side, index: number, name: string, exType: ExerciseType) =>
     setSheet({ type: 'entry', exId, side, index, name, exType });
 
-  const actions = {
+  const exerciseActions = {
     addExercise: t.addExercise,
     deleteExercise: t.deleteExercise,
     moveExercise: t.moveExercise,
@@ -144,6 +143,14 @@ function TrainingApp({ userEmail, onLogout }: { userEmail: string; onLogout: () 
     setType: t.setExerciseType,
     setText: t.setExerciseText,
     setSets: t.setExerciseSets,
+  };
+
+  const blockActions = {
+    addBlock: t.addBlock,
+    deleteBlock: t.deleteBlock,
+    moveBlock: t.moveBlock,
+    setBlockName: t.setBlockName,
+    setBlockKind: t.setBlockKind,
   };
 
   const warmupActions = {
@@ -184,10 +191,9 @@ function TrainingApp({ userEmail, onLogout }: { userEmail: string; onLogout: () 
         ) : t.day ? (
           <DayView
             day={t.day}
-            blocks={t.blocks}
             mode={mode}
             warmup={t.plan.warmup}
-            session={t.session}
+            log={t.log}
             warmOpen={t.open === 'warm'}
             onToggleWarmOpen={() => t.setOpen(t.open === 'warm' ? null : 'warm')}
             onToggleWarmupItem={t.toggleWarmupItem}
@@ -196,8 +202,9 @@ function TrainingApp({ userEmail, onLogout }: { userEmail: string; onLogout: () 
             lastVal={t.lastVal}
             onOpenInfo={(exId) => setSheet({ type: 'info', exId })}
             onOpenEntry={openEntry}
-            actions={actions}
-            onAddBlock={t.addBlock}
+            actions={exerciseActions}
+            blockActions={blockActions}
+            onEditPlan={() => t.day && setSheet({ type: 'editPlan', day: t.day })}
           />
         ) : activeSession && mode === 'log' ? (
           <PlainSession
@@ -257,7 +264,6 @@ function TrainingApp({ userEmail, onLogout }: { userEmail: string; onLogout: () 
           {sheet.type === 'data' && (
             <DataSheet
               state={{ plan: t.plan, logs: t.logs }}
-              today={t.today}
               onImport={(data) => {
                 t.importState(data);
                 closeSheet();
@@ -277,11 +283,27 @@ function TrainingApp({ userEmail, onLogout }: { userEmail: string; onLogout: () 
           )}
 
           {sheet.type === 'newPlan' && (
-            <NewPlanSheet
+            <PlanSheet
               onSubmit={(input) => {
                 const day = t.addDay(input);
                 setEditDayId(day.id);
                 setMode('edit');
+                closeSheet();
+              }}
+            />
+          )}
+
+          {sheet.type === 'editPlan' && (
+            <PlanSheet
+              key={sheet.day.id}
+              day={sheet.day}
+              onSubmit={(input) => {
+                t.updateDay(sheet.day.id, input);
+                closeSheet();
+              }}
+              onDelete={() => {
+                t.deleteDay(sheet.day.id);
+                setEditDayId(t.plan.days.find((d) => d.id !== sheet.day.id)?.id ?? '');
                 closeSheet();
               }}
             />
@@ -293,13 +315,12 @@ function TrainingApp({ userEmail, onLogout }: { userEmail: string; onLogout: () 
               types={sessions.types}
               days={t.plan.days}
               onAddType={sessions.addSessionType}
+              onDeleteType={sessions.removeSessionType}
               onSubmit={async (input) => {
-                const created = await sessions.addSession(input);
-                if (created) closeSheet();
+                if (await sessions.addSession(input)) closeSheet();
               }}
               onSubmitRule={async (input) => {
-                const created = await sessions.addRule(input);
-                if (created) closeSheet();
+                if (await sessions.addRule(input)) closeSheet();
               }}
             />
           )}
@@ -308,12 +329,11 @@ function TrainingApp({ userEmail, onLogout }: { userEmail: string; onLogout: () 
             <SessionDetailSheet
               key={sheet.session.id}
               session={sheet.session}
-              type={sessions.types.find((ty) => ty.id === sheet.session.sessionTypeId)}
+              type={typeById.get(sheet.session.sessionTypeId)}
               day={t.plan.days.find((d) => d.id === sheet.session.dayId)}
               days={t.plan.days}
               onReschedule={async (date, time, scope) => {
-                const updated = await sessions.reschedule(sheet.session.id, date, time, scope);
-                if (updated) closeSheet();
+                if (await sessions.reschedule(sheet.session.id, date, time, scope)) closeSheet();
               }}
               onChangePlan={async (dayId, scope) => {
                 const updated = await sessions.updateSession(
@@ -324,12 +344,10 @@ function TrainingApp({ userEmail, onLogout }: { userEmail: string; onLogout: () 
                 if (updated) closeSheet();
               }}
               onMarkStatus={async (status) => {
-                const updated = await sessions.markStatus(sheet.session.id, status);
-                if (updated) closeSheet();
+                if (await sessions.markStatus(sheet.session.id, status)) closeSheet();
               }}
               onDelete={async (scope) => {
-                const ok = await sessions.removeSession(sheet.session.id, scope);
-                if (ok) closeSheet();
+                if (await sessions.removeSession(sheet.session.id, scope)) closeSheet();
               }}
               onStartWorkout={() => {
                 openTraining(sheet.session);
@@ -343,12 +361,10 @@ function TrainingApp({ userEmail, onLogout }: { userEmail: string; onLogout: () 
       {introOpen && (
         <Onboarding
           types={sessions.types}
-          today={t.today}
+          startDate={currentDate}
           onAddType={sessions.addSessionType}
           onFinish={async (rules) => {
-            for (const rule of rules) {
-              await sessions.addRule(rule);
-            }
+            await sessions.addRules(rules);
             closeIntro();
             setView('calendar');
           }}

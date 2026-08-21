@@ -43,11 +43,6 @@ public class PlannedSessionController {
         return plannedSessionService.listByRange(principal.id(), from, to);
     }
 
-    @GetMapping("/{id}")
-    public PlannedSessionDto getOne(@AuthenticationPrincipal UserPrincipal principal, @PathVariable Long id) {
-        return plannedSessionService.getOne(principal.id(), id);
-    }
-
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public PlannedSessionDto create(@AuthenticationPrincipal UserPrincipal principal,

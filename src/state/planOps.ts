@@ -1,11 +1,12 @@
 import type {
   BilateralExercise,
   Block,
+  BlockKind,
   BlockRef,
-  BlockView,
   Day,
   Exercise,
   Plan,
+  Slot,
   UnilateralExercise,
 } from '../types';
 import { uid } from '../data/plan';
@@ -19,64 +20,81 @@ export function curDay(plan: Plan, dayId: string): Day | undefined {
   return plan.days.find((d) => d.id === dayId);
 }
 
-export function addDay(plan: Plan, day: Day): Plan {
-  return { ...plan, days: [...plan.days, day] };
-}
-
-export function allBlocksForDay(plan: Plan, day: Day | undefined): BlockView[] {
-  if (!day) return [];
-  const shared: BlockView[] = plan.hip ? [{ ...plan.hip, shared: true }] : [];
-  return [...shared, ...day.blocks];
-}
-
 export function findExercise(plan: Plan, id: string): Exercise | null {
-  const blocks = [...(plan.hip ? [plan.hip] : []), ...plan.days.flatMap((d) => d.blocks)];
-  for (const block of blocks) {
-    const found = block.ex.find((x) => x.id === id);
-    if (found) return found;
+  for (const day of plan.days) {
+    for (const block of day.blocks) {
+      const found = block.ex.find((x) => x.id === id);
+      if (found) return found;
+    }
   }
   return null;
 }
 
-export function getBlock(plan: Plan, ref: BlockRef): Block {
-  if (ref.kind === 'hip') {
-    if (!plan.hip) throw new Error('Plan has no shared block');
-    return plan.hip;
-  }
-  const day = plan.days.find((d) => d.id === ref.dayId);
-  const block = day?.blocks[ref.index];
-  if (!block) throw new Error(`Unknown block ${ref.index} on day ${ref.dayId}`);
-  return block;
+export function addDay(plan: Plan, day: Day): Plan {
+  return { ...plan, days: [...plan.days, day] };
+}
+
+export function updateDay(
+  plan: Plan,
+  dayId: string,
+  patch: { title: string; short: string; slot: Slot },
+): Plan {
+  return {
+    ...plan,
+    days: plan.days.map((d) => (d.id === dayId ? { ...d, ...patch } : d)),
+  };
+}
+
+export function deleteDay(plan: Plan, dayId: string): Plan {
+  return { ...plan, days: plan.days.filter((d) => d.id !== dayId) };
+}
+
+function withDay(plan: Plan, dayId: string, updater: (day: Day) => Day): Plan {
+  return { ...plan, days: plan.days.map((d) => (d.id === dayId ? updater(d) : d)) };
 }
 
 function withBlock(plan: Plan, ref: BlockRef, updater: (block: Block) => Block): Plan {
-  if (ref.kind === 'hip') return plan.hip ? { ...plan, hip: updater(plan.hip) } : plan;
-  return {
-    ...plan,
-    days: plan.days.map((d) =>
-      d.id === ref.dayId
-        ? { ...d, blocks: d.blocks.map((b, i) => (i === ref.index ? updater(b) : b)) }
-        : d,
-    ),
-  };
+  return withDay(plan, ref.dayId, (d) => ({
+    ...d,
+    blocks: d.blocks.map((b, i) => (i === ref.index ? updater(b) : b)),
+  }));
+}
+
+export function addBlockToDay(plan: Plan, dayId: string): Plan {
+  return withDay(plan, dayId, (d) => ({
+    ...d,
+    blocks: [...d.blocks, { kind: 'core', name: 'Neuer Block', ex: [newExercise()] }],
+  }));
+}
+
+export function deleteBlock(plan: Plan, ref: BlockRef): Plan {
+  return withDay(plan, ref.dayId, (d) => ({
+    ...d,
+    blocks: d.blocks.filter((_, i) => i !== ref.index),
+  }));
+}
+
+export function moveBlock(plan: Plan, ref: BlockRef, dir: -1 | 1): Plan {
+  return withDay(plan, ref.dayId, (d) => {
+    const target = ref.index + dir;
+    if (target < 0 || target >= d.blocks.length) return d;
+    const blocks = [...d.blocks];
+    const [item] = blocks.splice(ref.index, 1);
+    blocks.splice(target, 0, item);
+    return { ...d, blocks };
+  });
+}
+
+export function setBlockName(plan: Plan, ref: BlockRef, name: string): Plan {
+  return withBlock(plan, ref, (b) => ({ ...b, name }));
+}
+
+export function setBlockKind(plan: Plan, ref: BlockRef, kind: BlockKind): Plan {
+  return withBlock(plan, ref, (b) => ({ ...b, kind }));
 }
 
 export function addExercise(plan: Plan, ref: BlockRef): Plan {
   return withBlock(plan, ref, (b) => ({ ...b, ex: [...b.ex, newExercise()] }));
-}
-
-export function addBlockToDay(plan: Plan, dayId: string): Plan {
-  return {
-    ...plan,
-    days: plan.days.map((d) =>
-      d.id === dayId
-        ? {
-            ...d,
-            blocks: [...d.blocks, { kind: 'core', name: 'Neuer Block', ex: [newExercise()] }],
-          }
-        : d,
-    ),
-  };
 }
 
 export function deleteExercise(plan: Plan, ref: BlockRef, exId: string): Plan {
@@ -95,7 +113,9 @@ export function moveExercise(plan: Plan, ref: BlockRef, exId: string, dir: -1 | 
   });
 }
 
-type ExerciseTextField = 'name' | 'reps' | 'note' | 'desc';
+export type ExerciseTextField = 'name' | 'reps' | 'note' | 'desc';
+
+export type ExerciseSetsField = 'sets' | 'setsL' | 'setsR';
 
 function convertUni(x: Exercise, uni: boolean): Exercise {
   if (x.uni === uni) return x;
@@ -110,11 +130,20 @@ function convertUni(x: Exercise, uni: boolean): Exercise {
   return { ...base, uni: false, sets: fallback };
 }
 
-export function setExerciseUni(plan: Plan, ref: BlockRef, exId: string, uni: boolean): Plan {
+function withExercise(
+  plan: Plan,
+  ref: BlockRef,
+  exId: string,
+  updater: (exercise: Exercise) => Exercise,
+): Plan {
   return withBlock(plan, ref, (b) => ({
     ...b,
-    ex: b.ex.map((x) => (x.id === exId ? convertUni(x, uni) : x)),
+    ex: b.ex.map((x) => (x.id === exId ? updater(x) : x)),
   }));
+}
+
+export function setExerciseUni(plan: Plan, ref: BlockRef, exId: string, uni: boolean): Plan {
+  return withExercise(plan, ref, exId, (x) => convertUni(x, uni));
 }
 
 export function setExerciseType(
@@ -123,10 +152,7 @@ export function setExerciseType(
   exId: string,
   type: Exercise['type'],
 ): Plan {
-  return withBlock(plan, ref, (b) => ({
-    ...b,
-    ex: b.ex.map((x) => (x.id === exId ? { ...x, type } : x)),
-  }));
+  return withExercise(plan, ref, exId, (x) => ({ ...x, type }));
 }
 
 export function setExerciseText(
@@ -136,24 +162,18 @@ export function setExerciseText(
   field: ExerciseTextField,
   value: string,
 ): Plan {
-  return withBlock(plan, ref, (b) => ({
-    ...b,
-    ex: b.ex.map((x) => (x.id === exId ? { ...x, [field]: value } : x)),
-  }));
+  return withExercise(plan, ref, exId, (x) => ({ ...x, [field]: value }));
 }
 
 export function setExerciseSets(
   plan: Plan,
   ref: BlockRef,
   exId: string,
-  field: 'sets' | 'setsL' | 'setsR',
+  field: ExerciseSetsField,
   value: number,
 ): Plan {
-  const clamped = Math.max(0, value || 0);
-  return withBlock(plan, ref, (b) => ({
-    ...b,
-    ex: b.ex.map((x) => (x.id === exId ? ({ ...x, [field]: clamped } as Exercise) : x)),
-  }));
+  const clamped = Math.min(99, Math.max(0, value || 0));
+  return withExercise(plan, ref, exId, (x) => ({ ...x, [field]: clamped }) as Exercise);
 }
 
 export function addWarmupItem(plan: Plan): Plan {

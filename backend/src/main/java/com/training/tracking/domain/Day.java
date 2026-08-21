@@ -26,7 +26,8 @@ public class Day {
     @Column(name = "short_label", nullable = false, length = 32)
     private String shortLabel;
 
-    @Column(length = 32)
+    /** One of 'morgens' | 'nachmittags'; DB CHECK enforces valid values. */
+    @Column(nullable = false, length = 32)
     private String slot;
 
     @Column(nullable = false)

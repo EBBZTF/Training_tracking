@@ -14,10 +14,7 @@
 }
 
 .dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: var(--k, var(--faint));
+  composes: accentDot from '../../styles/shared.module.scss';
 }
 
 .title {
@@ -51,14 +48,8 @@
   margin-top: 14px;
 }
 
-.mini {
-  flex: 1;
-  font-size: 13px;
-  padding: 11px 8px;
-  border-radius: 8px;
-  border: 1px solid var(--line);
-  color: var(--mute);
-  text-align: center;
+.rowButton {
+  composes: rowButton from '../../styles/shared.module.scss';
 }
 
 .ghost {

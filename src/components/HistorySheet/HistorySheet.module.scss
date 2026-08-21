@@ -1,18 +1,18 @@
 .title {
-  composes: h2 from '../Sheet/Sheet.module.scss';
+  composes: sheetTitle from '../../styles/shared.module.scss';
 }
 
 .sub {
-  composes: sub from '../Sheet/Sheet.module.scss';
+  composes: sheetSub from '../../styles/shared.module.scss';
 }
 
-.hist {
+.entry {
   border-top: 1px solid var(--line);
   padding: 13px 0;
   font-size: 14px;
 }
 
-.d {
+.when {
   font-family: var(--num);
   font-size: 12px;
   color: var(--faint);

@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import type { CSSProperties } from 'react';
+import { colorAccent } from '../../utils/cssVar';
 import styles from './Tabs.module.scss';
 
 export interface TabItem {
@@ -62,7 +62,7 @@ export function Tabs({
           className={`${styles.tab} ${item.id === activeId ? styles.on : ''} ${
             item.dim ? styles.dim : ''
           }`}
-          style={item.accent ? ({ '--k': item.accent } as CSSProperties) : undefined}
+          style={item.accent ? colorAccent(item.accent) : undefined}
           onClick={() => onSelect(item.id)}
         >
           <b>{item.top}</b>

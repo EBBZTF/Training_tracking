@@ -96,12 +96,16 @@ export function SessionDetailSheet({
       {pending && (
         <div className={styles.scope}>
           <div className={styles.scopeText}>{PENDING_PROMPT[pending.action]}</div>
-          <button type="button" className={styles.mini} onClick={() => run(pending.action, 'one')}>
+          <button
+            type="button"
+            className={styles.rowButton}
+            onClick={() => run(pending.action, 'one')}
+          >
             Nur dieser Termin
           </button>
           <button
             type="button"
-            className={styles.mini}
+            className={styles.rowButton}
             onClick={() => run(pending.action, 'future')}
           >
             Alle künftigen Termine
@@ -156,10 +160,10 @@ export function SessionDetailSheet({
       )}
 
       <div className={styles.row}>
-        <button type="button" className={styles.mini} onClick={() => onMarkStatus('done')}>
+        <button type="button" className={styles.rowButton} onClick={() => onMarkStatus('done')}>
           Erledigt markieren
         </button>
-        <button type="button" className={styles.mini} onClick={() => onMarkStatus('skipped')}>
+        <button type="button" className={styles.rowButton} onClick={() => onMarkStatus('skipped')}>
           Überspringen
         </button>
       </div>

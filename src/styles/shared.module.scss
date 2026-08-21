@@ -1,3 +1,10 @@
+/*
+ * The primitives every component composes from. A class belongs here once a second component wants
+ * it; anything used in exactly one place stays in that component's own module.
+ */
+
+/* --- Buttons --- */
+
 .solid {
   width: 100%;
   padding: 15px;
@@ -17,7 +24,7 @@
   margin-top: 8px;
 }
 
-.addbtn {
+.addButton {
   width: 100%;
   padding: 12px;
   border: 1px dashed var(--line);
@@ -25,4 +32,126 @@
   color: var(--mute);
   font-size: 13.5px;
   margin-top: 2px;
+}
+
+/** An outlined button sized to sit next to its siblings in a row. */
+.rowButton {
+  flex: 1;
+  font-size: 13px;
+  padding: 11px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  color: var(--mute);
+  text-align: center;
+}
+
+/** The compact variant used inside editors, where several fit on one line. */
+.smallButton {
+  flex: none;
+  font-size: 12.5px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  color: var(--mute);
+}
+
+/** Destructive intent on an outlined button. */
+.dangerOutline {
+  color: var(--kraft);
+  border-color: var(--kraft-line);
+}
+
+/* --- Sheet typography --- */
+
+.sheetTitle {
+  margin: 0 0 4px;
+  font-size: 19px;
+  letter-spacing: -0.01em;
+}
+
+.sheetSub {
+  color: var(--mute);
+  font-size: 13px;
+  margin-bottom: 16px;
+}
+
+/* --- Form fields --- */
+
+/** A stacked label + control. Styles the control by element so callers stay markup-only. */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 12px;
+
+  label {
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--faint);
+  }
+
+  input,
+  select,
+  textarea {
+    background: var(--panel2);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 9px 10px;
+    font-size: 15px;
+    width: 100%;
+  }
+
+  input[type='color'] {
+    padding: 3px;
+    height: 40px;
+  }
+
+  textarea {
+    resize: vertical;
+    line-height: 1.5;
+    font-size: 14px;
+  }
+}
+
+/* --- Weekday picker, shared by the onboarding and the add-session sheet --- */
+
+.weekdayGrid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+
+.weekday {
+  padding: 9px 0;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--mute);
+  font-size: 12.5px;
+}
+
+.weekdayOn {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--bg);
+  font-weight: 650;
+}
+
+/* --- Accent marks, driven by the --k custom property --- */
+
+/** The thin vertical rule that opens a block heading. */
+.accentBar {
+  width: 3px;
+  height: 15px;
+  border-radius: 2px;
+  background: var(--k);
+}
+
+/** The round swatch that marks a session type. */
+.accentDot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--k, var(--faint));
 }

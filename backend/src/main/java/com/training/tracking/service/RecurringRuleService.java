@@ -207,7 +207,7 @@ public class RecurringRuleService {
     private void dropPlannedFrom(RecurringRule rule, LocalDate from) {
         List<PlannedSession> stale = plannedSessionRepository
                 .findAllByRule_IdAndOccurrenceDateGreaterThanEqual(rule.getId(), from).stream()
-                .filter(s -> "planned".equals(s.getStatus()))
+                .filter(s -> PlannedSession.STATUS_PLANNED.equals(s.getStatus()))
                 .toList();
         if (!stale.isEmpty()) {
             plannedSessionRepository.deleteAllInBatch(stale);
@@ -227,7 +227,7 @@ public class RecurringRuleService {
         session.setSessionType(rule.getSessionType());
         session.setDayKey(rule.getDayKey());
         session.setNotes(rule.getNotes());
-        session.setStatus("planned");
+        session.setStatus(PlannedSession.STATUS_PLANNED);
         session.setRule(rule);
         session.setOccurrenceDate(date);
         session.setCreatedAt(Instant.now());

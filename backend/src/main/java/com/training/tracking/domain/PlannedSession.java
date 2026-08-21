@@ -13,10 +13,19 @@ import jakarta.persistence.Table;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.Set;
 
 @Entity
 @Table(name = "planned_sessions")
 public class PlannedSession {
+
+    public static final String STATUS_PLANNED = "planned";
+    public static final String STATUS_DONE = "done";
+    public static final String STATUS_SKIPPED = "skipped";
+
+    /** Every value the status column accepts. */
+    public static final Set<String> STATUSES =
+            Set.of(STATUS_PLANNED, STATUS_DONE, STATUS_SKIPPED);
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -51,7 +60,7 @@ public class PlannedSession {
     @Column(name = "occurrence_date")
     private LocalDate occurrenceDate;
 
-    /** One of 'planned' | 'done' | 'skipped'; DB CHECK enforces valid values, matching Exercise.type's convention. */
+    /** One of {@link #STATUSES}; DB CHECK enforces valid values, matching Exercise.type's convention. */
     @Column(nullable = false, length = 16)
     private String status;
 

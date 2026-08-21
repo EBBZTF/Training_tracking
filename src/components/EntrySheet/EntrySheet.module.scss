@@ -1,9 +1,9 @@
 .title {
-  composes: h2 from '../Sheet/Sheet.module.scss';
+  composes: sheetTitle from '../../styles/shared.module.scss';
 }
 
 .sub {
-  composes: sub from '../Sheet/Sheet.module.scss';
+  composes: sheetSub from '../../styles/shared.module.scss';
 }
 
 .solid {

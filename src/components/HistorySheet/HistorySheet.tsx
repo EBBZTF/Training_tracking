@@ -1,15 +1,18 @@
-import type { Plan, Session, Side } from '../../types';
+import type { Plan, Side, WorkoutLog } from '../../types';
 import { findExercise } from '../../state/planOps';
 import styles from './HistorySheet.module.scss';
 
 interface HistorySheetProps {
   plan: Plan;
-  logs: Session[];
+  logs: WorkoutLog[];
 }
 
 const SIDES: Side[] = ['B', 'L', 'R'];
 
-function describeSession(plan: Plan, s: Session): string {
+/** The plan this was logged against has since been deleted; the entry itself stays. */
+const GONE = 'gelöschter Plan';
+
+function describeLog(plan: Plan, s: WorkoutLog): string {
   const parts: string[] = [];
   for (const [exId, sides] of Object.entries(s.vals)) {
     const ex = findExercise(plan, exId);
@@ -36,11 +39,11 @@ export function HistorySheet({ plan, logs }: HistorySheetProps) {
         rows.map((s) => {
           const day = plan.days.find((d) => d.id === s.dayId);
           return (
-            <div className={styles.hist} key={`${s.date}-${s.dayId}`}>
-              <div className={styles.d}>
-                {s.date} · {day ? day.title : s.dayId}
+            <div className={styles.entry} key={`${s.date}-${s.dayId}`}>
+              <div className={styles.when}>
+                {s.date} · {day ? day.title : GONE}
               </div>
-              <div className={styles.vals}>{describeSession(plan, s)}</div>
+              <div className={styles.vals}>{describeLog(plan, s)}</div>
             </div>
           );
         })

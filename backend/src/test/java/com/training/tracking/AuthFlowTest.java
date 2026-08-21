@@ -15,7 +15,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -58,13 +57,15 @@ class AuthFlowTest {
         ResponseEntity<String> noAuthRes = restTemplate.getForEntity("/api/state", String.class);
         assertEquals(HttpStatus.UNAUTHORIZED, noAuthRes.getStatusCode());
 
-        // With a valid token, a brand-new user sees an empty (not-yet-seeded) plan.
+        // With a valid token, a brand-new user sees an empty plan rather than a null one, so the
+        // client never has to tell "no account data" apart from "account with nothing in it".
         HttpHeaders headers = new HttpHeaders();
         headers.setBearerAuth(accessToken);
         ResponseEntity<StateDto> stateRes = restTemplate.exchange(
                 "/api/state", HttpMethod.GET, new HttpEntity<>(headers), StateDto.class);
         assertEquals(HttpStatus.OK, stateRes.getStatusCode());
-        assertNull(stateRes.getBody().plan());
+        assertTrue(stateRes.getBody().plan().days().isEmpty());
+        assertTrue(stateRes.getBody().plan().warmup().isEmpty());
         assertTrue(stateRes.getBody().logs().isEmpty());
     }
 }

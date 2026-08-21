@@ -1,16 +1,15 @@
-import type { BlockRef, BlockView, Day, ExerciseType, Mode, Session, Side } from '../../types';
+import type { Block, BlockRef, Day, ExerciseType, Mode, Side, WorkoutLog } from '../../types';
 import { DayHeader } from '../DayHeader/DayHeader';
 import { WarmupSection } from '../WarmupSection/WarmupSection';
 import { BlockSection } from '../BlockSection/BlockSection';
-import type { ExerciseActions, WarmupActions } from '../types';
+import type { BlockActions, ExerciseActions, WarmupActions } from '../actions';
 import styles from './DayView.module.scss';
 
 interface DayViewProps {
   day: Day;
-  blocks: BlockView[];
   mode: Mode;
   warmup: string[];
-  session: Session | undefined;
+  log: WorkoutLog | undefined;
   warmOpen: boolean;
   onToggleWarmOpen: () => void;
   onToggleWarmupItem: (index: number) => void;
@@ -20,20 +19,20 @@ interface DayViewProps {
   onOpenInfo: (exId: string) => void;
   onOpenEntry: (exId: string, side: Side, i: number, name: string, type: ExerciseType) => void;
   actions: ExerciseActions;
-  onAddBlock: (dayId: string) => void;
+  blockActions: BlockActions;
+  onEditPlan: () => void;
 }
 
-function blockRefFor(block: BlockView, day: Day): BlockRef {
-  if (block.shared) return { kind: 'hip' };
-  return { kind: 'day', dayId: day.id, index: day.blocks.indexOf(block) };
+/** A block's identity within the plan is its position on its day, which is also its React key. */
+function refFor(day: Day, index: number): BlockRef {
+  return { dayId: day.id, index };
 }
 
 export function DayView({
   day,
-  blocks,
   mode,
   warmup,
-  session,
+  log,
   warmOpen,
   onToggleWarmOpen,
   onToggleWarmupItem,
@@ -43,7 +42,8 @@ export function DayView({
   onOpenInfo,
   onOpenEntry,
   actions,
-  onAddBlock,
+  blockActions,
+  onEditPlan,
 }: DayViewProps) {
   const editing = mode === 'edit';
 
@@ -51,9 +51,17 @@ export function DayView({
     <>
       <DayHeader day={day} />
 
+      {editing && (
+        <div className={styles.planRow}>
+          <button type="button" className={styles.planEdit} onClick={onEditPlan}>
+            Plan bearbeiten
+          </button>
+        </div>
+      )}
+
       <WarmupSection
         items={warmup}
-        session={session}
+        log={log}
         open={warmOpen}
         editing={editing}
         onToggleOpen={onToggleWarmOpen}
@@ -61,23 +69,30 @@ export function DayView({
         actions={warmupActions}
       />
 
-      {blocks.map((block) => (
+      {day.blocks.map((block: Block, index: number) => (
         <BlockSection
-          key={block.shared ? 'hip' : `${day.id}-${blocks.indexOf(block)}`}
+          key={`${day.id}-${index}`}
           block={block}
-          blockRef={blockRefFor(block, day)}
+          blockRef={refFor(day, index)}
+          isFirst={index === 0}
+          isLast={index === day.blocks.length - 1}
           editing={editing}
           getVal={getVal}
           lastVal={lastVal}
           onOpenInfo={onOpenInfo}
           onOpenEntry={onOpenEntry}
           actions={actions}
+          blockActions={blockActions}
         />
       ))}
 
       {editing && (
         <div className={styles.block}>
-          <button type="button" className={styles.addbtn} onClick={() => onAddBlock(day.id)}>
+          <button
+            type="button"
+            className={styles.addButton}
+            onClick={() => blockActions.addBlock(day.id)}
+          >
             + Block hinzufügen
           </button>
         </div>

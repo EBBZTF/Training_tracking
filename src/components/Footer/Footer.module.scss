@@ -5,7 +5,7 @@
   bottom: 0;
   z-index: 20;
   display: flex;
-  background: rgba(23, 23, 26, 0.96);
+  background: var(--bg-veil);
   backdrop-filter: blur(12px);
   border-top: 1px solid var(--line);
   padding: 8px 8px calc(env(safe-area-inset-bottom) + 8px);

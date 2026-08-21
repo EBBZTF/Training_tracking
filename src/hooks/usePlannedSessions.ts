@@ -1,15 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type {
   EditScope,
+  NewRecurringRule,
   PlannedSession,
   PlannedSessionStatus,
-  RecurringRule,
   SessionType,
 } from '../types';
 import {
-  loadSessionTypes,
-  createSessionType,
-  deleteSessionType,
   loadPlannedSessions,
   createPlannedSession,
   updatePlannedSession,
@@ -18,6 +15,7 @@ import {
   deletePlannedSession,
   SERIES_CHANGED,
 } from '../api/plannedSessions';
+import { loadSessionTypes, createSessionType, deleteSessionType } from '../api/sessionTypes';
 import { createRecurringRule } from '../api/recurringRules';
 import { monthRange } from '../utils/date';
 
@@ -29,7 +27,7 @@ export function usePlannedSessions(notify: (message: string) => void) {
   /** Bumped to refetch the visible range after a change that touched a whole series. */
   const [reloadNonce, setReloadNonce] = useState(0);
 
-  // Loaded once on mount.
+  // `notify` is stable, so this loads once on mount.
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -41,33 +39,62 @@ export function usePlannedSessions(notify: (message: string) => void) {
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [notify]);
 
-  // Reloaded whenever the visible range changes.
-  const rangeKey = `${range.from}:${range.to}:${reloadNonce}`;
-  const reloadToken = useRef(0);
+  // Reloaded whenever the visible range changes, or a series edit invalidated it.
+  const latestFetch = useRef(0);
   useEffect(() => {
-    const token = ++reloadToken.current;
-    let cancelled = false;
+    const token = ++latestFetch.current;
     (async () => {
       const data = await loadPlannedSessions(range.from, range.to);
-      if (cancelled || token !== reloadToken.current) return;
+      if (token !== latestFetch.current) return;
       if (data) setSessions(data);
       else notify('Termine konnten nicht geladen werden');
       setReady(true);
     })();
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rangeKey]);
+  }, [range.from, range.to, reloadNonce, notify]);
 
   const setVisibleRange = useCallback((from: string, to: string) => {
     setRange((prev) => (prev.from === from && prev.to === to ? prev : { from, to }));
   }, []);
 
   const reload = useCallback(() => setReloadNonce((n) => n + 1), []);
+
+  /**
+   * Applies an optimistic patch, then reconciles with what the server actually stored. Both the
+   * patch and the rollback go through the updater form, so a concurrent change to another session
+   * is never clobbered by a stale snapshot.
+   */
+  const optimistically = useCallback(
+    async <T>(
+      patch: (session: PlannedSession) => PlannedSession,
+      id: number,
+      send: () => Promise<T | null>,
+      failure: string,
+    ): Promise<T | null> => {
+      let rolledBack: PlannedSession | undefined;
+      setSessions((prev) =>
+        prev.map((s) => {
+          if (s.id !== id) return s;
+          rolledBack = s;
+          return patch(s);
+        }),
+      );
+      const result = await send();
+      if (result === null) {
+        setSessions((prev) => prev.map((s) => (s.id === id && rolledBack ? rolledBack : s)));
+        notify(failure);
+        return null;
+      }
+      if (result === SERIES_CHANGED) {
+        reload();
+        return result;
+      }
+      setSessions((prev) => prev.map((s) => (s.id === id ? (result as PlannedSession) : s)));
+      return result;
+    },
+    [notify, reload],
+  );
 
   const addSession = useCallback(
     async (input: {
@@ -89,76 +116,55 @@ export function usePlannedSessions(notify: (message: string) => void) {
   );
 
   const updateSession = useCallback(
-    async (
+    (
       id: number,
       patch: { sessionTypeId: number; dayId?: string; notes?: string },
       scope: EditScope = 'one',
-    ) => {
-      const prevSessions = sessions;
-      if (scope === 'one') {
-        setSessions((prev) => prev.map((s) => (s.id === id ? { ...s, ...patch } : s)));
-      }
-      const updated = await updatePlannedSession(id, { ...patch, scope });
-      if (!updated) {
-        setSessions(prevSessions);
-        notify('Änderung konnte nicht gespeichert werden');
-        return null;
-      }
-      if (updated === SERIES_CHANGED) {
-        reload();
-        return SERIES_CHANGED;
-      }
-      setSessions((prev) => prev.map((s) => (s.id === id ? updated : s)));
-      return updated;
-    },
-    [sessions, notify, reload],
+    ) =>
+      optimistically(
+        (s) => (scope === 'one' ? { ...s, ...patch } : s),
+        id,
+        () => updatePlannedSession(id, { ...patch, scope }),
+        'Änderung konnte nicht gespeichert werden',
+      ),
+    [optimistically],
   );
 
   const reschedule = useCallback(
-    async (id: number, date: string, time?: string, scope: EditScope = 'one') => {
-      const prevSessions = sessions;
-      if (scope === 'one') {
-        setSessions((prev) => prev.map((s) => (s.id === id ? { ...s, date, time } : s)));
-      }
-      const updated = await reschedulePlannedSession(id, { date, time, scope });
-      if (!updated) {
-        setSessions(prevSessions);
-        notify('Verschieben fehlgeschlagen');
-        return null;
-      }
-      if (updated === SERIES_CHANGED) {
-        reload();
-        return SERIES_CHANGED;
-      }
-      setSessions((prev) => prev.map((s) => (s.id === id ? updated : s)));
-      return updated;
-    },
-    [sessions, notify, reload],
+    (id: number, date: string, time?: string, scope: EditScope = 'one') =>
+      optimistically(
+        (s) => (scope === 'one' ? { ...s, date, time } : s),
+        id,
+        () => reschedulePlannedSession(id, { date, time, scope }),
+        'Verschieben fehlgeschlagen',
+      ),
+    [optimistically],
   );
 
   const markStatus = useCallback(
-    async (id: number, status: PlannedSessionStatus) => {
-      const prevSessions = sessions;
-      setSessions((prev) => prev.map((s) => (s.id === id ? { ...s, status } : s)));
-      const updated = await updatePlannedSessionStatus(id, status);
-      if (!updated) {
-        setSessions(prevSessions);
-        notify('Status konnte nicht gespeichert werden');
-        return null;
-      }
-      setSessions((prev) => prev.map((s) => (s.id === id ? updated : s)));
-      return updated;
-    },
-    [sessions, notify],
+    (id: number, status: PlannedSessionStatus) =>
+      optimistically(
+        (s) => ({ ...s, status }),
+        id,
+        () => updatePlannedSessionStatus(id, status),
+        'Status konnte nicht gespeichert werden',
+      ),
+    [optimistically],
   );
 
   const removeSession = useCallback(
     async (id: number, scope: EditScope = 'one') => {
-      const prevSessions = sessions;
-      setSessions((prev) => prev.filter((s) => s.id !== id));
+      let removed: PlannedSession | undefined;
+      setSessions((prev) =>
+        prev.filter((s) => {
+          if (s.id !== id) return true;
+          removed = s;
+          return false;
+        }),
+      );
       const ok = await deletePlannedSession(id, scope);
       if (!ok) {
-        setSessions(prevSessions);
+        if (removed) setSessions((prev) => [...prev, removed as PlannedSession]);
         notify('Löschen fehlgeschlagen');
         return false;
       }
@@ -166,30 +172,29 @@ export function usePlannedSessions(notify: (message: string) => void) {
       if (scope === 'future') reload();
       return true;
     },
-    [sessions, notify, reload],
+    [notify, reload],
   );
 
-  const addRule = useCallback(
-    async (input: {
-      sessionTypeId: number;
-      dayId?: string;
-      time?: string;
-      notes?: string;
-      pattern: RecurringRule['pattern'];
-      weekdays?: number;
-      intervalDays?: number;
-      startDate: string;
-      endDate?: string;
-    }) => {
-      const created = await createRecurringRule(input);
-      if (!created) {
-        notify('Wiederholung konnte nicht angelegt werden');
-        return null;
+  /**
+   * Creates every rule before reloading, so onboarding's handful of rules costs one range refetch
+   * instead of one per rule.
+   */
+  const addRules = useCallback(
+    async (inputs: NewRecurringRule[]) => {
+      let created = 0;
+      for (const input of inputs) {
+        if (await createRecurringRule(input)) created += 1;
       }
-      reload();
+      if (created < inputs.length) notify('Wiederholung konnte nicht angelegt werden');
+      if (created > 0) reload();
       return created;
     },
     [notify, reload],
+  );
+
+  const addRule = useCallback(
+    async (input: NewRecurringRule) => (await addRules([input])) === 1,
+    [addRules],
   );
 
   const addSessionType = useCallback(
@@ -207,28 +212,34 @@ export function usePlannedSessions(notify: (message: string) => void) {
 
   const removeSessionType = useCallback(
     async (id: number) => {
-      const prevTypes = types;
-      setTypes((prev) => prev.filter((t) => t.id !== id));
+      let removed: SessionType | undefined;
+      setTypes((prev) =>
+        prev.filter((t) => {
+          if (t.id !== id) return true;
+          removed = t;
+          return false;
+        }),
+      );
       const ok = await deleteSessionType(id);
       if (!ok) {
-        setTypes(prevTypes);
-        notify('Kategorie konnte nicht gelöscht werden');
+        if (removed) setTypes((prev) => [...prev, removed as SessionType]);
+        notify('Kategorie wird noch von einem Termin verwendet');
         return false;
       }
       return true;
     },
-    [types, notify],
+    [notify],
   );
 
   return {
     sessions,
     types,
-    range,
     ready,
     setVisibleRange,
     reload,
     addSession,
     addRule,
+    addRules,
     updateSession,
     reschedule,
     markStatus,
@@ -237,5 +248,3 @@ export function usePlannedSessions(notify: (message: string) => void) {
     removeSessionType,
   };
 }
-
-export type PlannedSessionsState = ReturnType<typeof usePlannedSessions>;

@@ -1,6 +1,6 @@
-import type { BlockRef, Exercise } from '../../types';
+import type { BlockRef, Exercise, ExerciseType } from '../../types';
 import { EXERCISE_TYPES, UNIT } from '../../data/constants';
-import type { ExerciseActions } from '../types';
+import type { ExerciseActions } from '../actions';
 import styles from './ExerciseEditor.module.scss';
 
 interface ExerciseEditorProps {
@@ -11,20 +11,22 @@ interface ExerciseEditorProps {
 
 export function ExerciseEditor({ exercise: x, blockRef, actions }: ExerciseEditorProps) {
   return (
-    <div className={styles.edit}>
-      <div className={`${styles.f} ${styles.wide}`}>
-        <label>Übung</label>
+    <div className={styles.editor}>
+      <div className={`${styles.field} ${styles.wide}`}>
+        <label htmlFor={`name-${x.id}`}>Übung</label>
         <input
+          id={`name-${x.id}`}
           value={x.name}
           onChange={(e) => actions.setText(blockRef, x.id, 'name', e.target.value)}
         />
       </div>
       <div className={styles.grid}>
-        <div className={styles.f}>
-          <label>Belastung</label>
+        <div className={styles.field}>
+          <label htmlFor={`type-${x.id}`}>Belastung</label>
           <select
+            id={`type-${x.id}`}
             value={x.type}
-            onChange={(e) => actions.setType(blockRef, x.id, e.target.value as Exercise['type'])}
+            onChange={(e) => actions.setType(blockRef, x.id, e.target.value as ExerciseType)}
           >
             {EXERCISE_TYPES.map((t) => (
               <option key={t} value={t}>
@@ -33,16 +35,18 @@ export function ExerciseEditor({ exercise: x, blockRef, actions }: ExerciseEdito
             ))}
           </select>
         </div>
-        <div className={styles.f}>
-          <label>Wiederholungen</label>
+        <div className={styles.field}>
+          <label htmlFor={`reps-${x.id}`}>Wiederholungen</label>
           <input
+            id={`reps-${x.id}`}
             value={x.reps}
             onChange={(e) => actions.setText(blockRef, x.id, 'reps', e.target.value)}
           />
         </div>
-        <div className={styles.f}>
-          <label>Seiten</label>
+        <div className={styles.field}>
+          <label htmlFor={`uni-${x.id}`}>Seiten</label>
           <select
+            id={`uni-${x.id}`}
             value={x.uni ? '1' : '0'}
             onChange={(e) => actions.setUni(blockRef, x.id, e.target.value === '1')}
           >
@@ -51,27 +55,30 @@ export function ExerciseEditor({ exercise: x, blockRef, actions }: ExerciseEdito
           </select>
         </div>
         {x.uni ? (
-          <div className={styles.f}>
+          <div className={styles.field}>
             <label>Sätze L / R</label>
             <div className={styles.setsRow}>
               <input
                 type="number"
                 inputMode="numeric"
+                aria-label="Sätze links"
                 value={x.setsL || 0}
                 onChange={(e) => actions.setSets(blockRef, x.id, 'setsL', Number(e.target.value))}
               />
               <input
                 type="number"
                 inputMode="numeric"
+                aria-label="Sätze rechts"
                 value={x.setsR || 0}
                 onChange={(e) => actions.setSets(blockRef, x.id, 'setsR', Number(e.target.value))}
               />
             </div>
           </div>
         ) : (
-          <div className={styles.f}>
-            <label>Sätze</label>
+          <div className={styles.field}>
+            <label htmlFor={`sets-${x.id}`}>Sätze</label>
             <input
+              id={`sets-${x.id}`}
               type="number"
               inputMode="numeric"
               value={x.sets || 1}
@@ -79,42 +86,46 @@ export function ExerciseEditor({ exercise: x, blockRef, actions }: ExerciseEdito
             />
           </div>
         )}
-        <div className={`${styles.f} ${styles.wide}`}>
-          <label>Notiz — kurzer Hinweis unter der Übung</label>
+        <div className={`${styles.field} ${styles.wide}`}>
+          <label htmlFor={`note-${x.id}`}>Notiz — kurzer Hinweis unter der Übung</label>
           <input
+            id={`note-${x.id}`}
             value={x.note ?? ''}
             onChange={(e) => actions.setText(blockRef, x.id, 'note', e.target.value)}
           />
         </div>
-        <div className={`${styles.f} ${styles.wide}`}>
-          <label>Anleitung — Text hinter dem i</label>
+        <div className={`${styles.field} ${styles.wide}`}>
+          <label htmlFor={`desc-${x.id}`}>Anleitung — Text hinter dem i</label>
           <textarea
+            id={`desc-${x.id}`}
             rows={4}
             value={x.desc ?? ''}
             onChange={(e) => actions.setText(blockRef, x.id, 'desc', e.target.value)}
           />
         </div>
       </div>
-      <div className={styles.erow}>
+      <div className={styles.buttonRow}>
         <button
           type="button"
-          className={styles.mini}
+          className={styles.smallButton}
           onClick={() => actions.moveExercise(blockRef, x.id, -1)}
         >
           ↑ Hoch
         </button>
         <button
           type="button"
-          className={styles.mini}
+          className={styles.smallButton}
           onClick={() => actions.moveExercise(blockRef, x.id, 1)}
         >
           ↓ Runter
         </button>
         <button
           type="button"
-          className={`${styles.mini} ${styles.danger} ${styles.spacer}`}
+          className={`${styles.smallButton} ${styles.danger} ${styles.pushRight}`}
           onClick={() => {
-            if (window.confirm('Übung löschen?')) actions.deleteExercise(blockRef, x.id);
+            if (window.confirm(`Übung "${x.name}" löschen?`)) {
+              actions.deleteExercise(blockRef, x.id);
+            }
           }}
         >
           Löschen

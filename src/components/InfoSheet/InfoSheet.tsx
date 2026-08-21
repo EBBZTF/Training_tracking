@@ -18,7 +18,7 @@ export function InfoSheet({ exercise: x, onClose }: InfoSheetProps) {
       <div className={styles.guide}>{x.desc || 'Keine Anleitung hinterlegt.'}</div>
       {x.note && (
         <div className={styles.cue}>
-          <span className={styles.cuelabel}>Achte darauf</span>
+          <span className={styles.cueLabel}>Achte darauf</span>
           {x.note}
         </div>
       )}

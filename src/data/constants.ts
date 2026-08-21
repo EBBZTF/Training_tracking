@@ -1,5 +1,9 @@
-import type { ExerciseType } from '../types';
+import type { BlockKind, ExerciseType } from '../types';
 
+/**
+ * How each exercise type is labelled. The keys are the single source of truth for
+ * {@link EXERCISE_TYPES} and mirror the CHECK constraint on `exercises.type`.
+ */
 export const UNIT: Record<ExerciseType, string> = {
   kg: 'kg',
   band: 'Band',
@@ -10,9 +14,12 @@ export const UNIT: Record<ExerciseType, string> = {
   min: 'Min',
 };
 
+export const EXERCISE_TYPES = Object.keys(UNIT) as ExerciseType[];
+
 /** Types whose values are picked from a fixed word list instead of typed as a number. */
 export const TEXTY: Partial<Record<ExerciseType, true>> = { band: true };
 
+/** Suggested values offered as one-tap chips when logging a set. */
 export const QUICK: Record<ExerciseType, (number | string)[]> = {
   kg: [2.5, 5, 7.5, 10, 12.5, 15, 20, 25, 30, 40],
   sek: [10, 15, 20, 30, 40, 45, 60],
@@ -23,4 +30,14 @@ export const QUICK: Record<ExerciseType, (number | string)[]> = {
   band: ['gelb', 'rot', 'grün', 'blau', 'schwarz'],
 };
 
-export const EXERCISE_TYPES: ExerciseType[] = ['kg', 'band', 'sek', 'bw', 'cm', 'm', 'min'];
+/** Block kinds and their labels; the keys mirror the CHECK constraint on `blocks.kind`. */
+export const BLOCK_KIND_LABEL: Record<BlockKind, string> = {
+  huefte: 'Hüfte',
+  skill: 'Skill',
+  kraft: 'Kraft',
+  explosiv: 'Explosiv',
+  core: 'Core',
+  ausdauer: 'Ausdauer',
+};
+
+export const BLOCK_KINDS = Object.keys(BLOCK_KIND_LABEL) as BlockKind[];

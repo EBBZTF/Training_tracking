@@ -12,12 +12,9 @@
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.04em;
+  color: var(--faint);
 
-  &.L {
-    color: var(--faint);
-  }
-
-  &.R {
+  &.sideRight {
     color: var(--huefte);
   }
 }
@@ -45,29 +42,16 @@
     background 0.12s;
   padding: 0 8px;
 
-  .v {
-    font-size: 16px;
-    font-weight: 600;
-    line-height: 1;
-  }
-
-  .u {
-    font-size: 9px;
-    color: var(--mute);
-    margin-top: 2px;
-    letter-spacing: 0.04em;
-  }
-
-  &.empty .v {
+  &.chipEmpty .chipValue {
     color: var(--faint);
     font-weight: 400;
   }
 
-  &.filled {
-    background: #2c2c36;
-    border-color: #46465a;
+  &.chipFilled {
+    background: var(--panel3);
+    border-color: var(--line-strong);
 
-    .v {
+    .chipValue {
       color: var(--ink);
     }
   }
@@ -76,4 +60,17 @@
     outline: 2px solid var(--skill);
     outline-offset: 2px;
   }
+}
+
+.chipValue {
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.chipUnit {
+  font-size: 9px;
+  color: var(--mute);
+  margin-top: 2px;
+  letter-spacing: 0.04em;
 }

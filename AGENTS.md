@@ -27,7 +27,11 @@ anything project-specific below. This includes, but is not limited to:
   untrusted. This app has multi-tenant auth (JWT) — be careful not to weaken tenant isolation or
   auth checks.
 - **Consistency with existing conventions.** Match the style already in the file/module you're
-  editing (naming, error handling, folder structure) rather than inventing a new pattern.
+  editing (naming, error handling, folder structure) rather than inventing a new pattern. In
+  particular: a style rule wanted by a second component moves to `src/styles/shared.module.scss`;
+  a closed set of string values gets a DB `CHECK` plus named constants, never bare literals; and
+  the client's own ids (`day_key`, `exercises.client_id`) are what cross-table references store,
+  because `PUT /api/state` recreates every plan row on each save.
 - **No dead code.** Don't leave commented-out code, unused imports, or placeholder
   TODO-without-context behind.
 - **Comments only where non-obvious.** Explain *why*, not *what*. Don't restate what well-named
@@ -47,6 +51,7 @@ npm install         # install deps
 npm run dev          # dev server, http://localhost:5500
 npm run build         # tsc -b && vite build
 npm run lint          # eslint .
+npm test              # vitest run (state/ and utils/ unit tests)
 ```
 
 Format with Prettier (`.prettierrc.json`: single quotes, 100 col width) before finishing frontend work.
@@ -54,7 +59,7 @@ Format with Prettier (`.prettierrc.json`: single quotes, 100 col width) before f
 Backend (run from `backend/`):
 
 ```bash
-./mvnw test           # run backend tests (JwtServiceTest, AuthFlowTest, etc.)
+./mvnw test           # run backend tests (StateServiceTest, AuthFlowTest, JwtServiceTest, etc.)
 ./mvnw spring-boot:run # run backend locally
 ```
 
@@ -67,6 +72,7 @@ docker compose up --build
 ## Verification checklist before finishing a task
 
 - [ ] `npm run lint` passes for any frontend change
+- [ ] `npm test` passes for any change under `src/state/` or `src/utils/`
 - [ ] `npm run build` succeeds if TypeScript types or build config changed
 - [ ] `./mvnw test` passes for any backend change (especially anything touching `security/` or auth)
 - [ ] No secrets, tokens, or real personal training data added to the repo

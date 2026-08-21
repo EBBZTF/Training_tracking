@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import type { Day, RecurrencePattern, SessionType } from '../../types';
-import { sessionTypeAccent } from '../../utils/cssVar';
+import type { Day, NewRecurringRule, RecurrencePattern, SessionType } from '../../types';
+import { defaultSessionTypeColor, sessionTypeAccent } from '../../utils/cssVar';
 import { WEEKDAY_SHORT, weekdayBit } from '../../utils/date';
 import styles from './AddSessionSheet.module.scss';
 
@@ -16,6 +16,7 @@ interface AddSessionSheetProps {
     color?: string;
     icon?: string;
   }) => Promise<SessionType | null>;
+  onDeleteType: (id: number) => Promise<boolean>;
   onSubmit: (input: {
     date: string;
     time?: string;
@@ -23,17 +24,7 @@ interface AddSessionSheetProps {
     dayId?: string;
     notes?: string;
   }) => void;
-  onSubmitRule: (input: {
-    sessionTypeId: number;
-    dayId?: string;
-    time?: string;
-    notes?: string;
-    pattern: RecurrencePattern;
-    weekdays?: number;
-    intervalDays?: number;
-    startDate: string;
-    endDate?: string;
-  }) => void;
+  onSubmitRule: (input: NewRecurringRule) => void;
 }
 
 const REPEAT_LABEL: Record<Repeat, string> = {
@@ -42,11 +33,14 @@ const REPEAT_LABEL: Record<Repeat, string> = {
   interval: 'Alle X Tage',
 };
 
+const REPEATS = Object.keys(REPEAT_LABEL) as Repeat[];
+
 export function AddSessionSheet({
   date,
   types,
   days,
   onAddType,
+  onDeleteType,
   onSubmit,
   onSubmitRule,
 }: AddSessionSheetProps) {
@@ -62,9 +56,11 @@ export function AddSessionSheet({
   const [endDate, setEndDate] = useState('');
   const [newTypeOpen, setNewTypeOpen] = useState(false);
   const [newLabel, setNewLabel] = useState('');
-  const [newColor, setNewColor] = useState('#5b9bc9');
+  const [newColor, setNewColor] = useState(defaultSessionTypeColor);
   const [newIcon, setNewIcon] = useState('');
   const [saving, setSaving] = useState(false);
+
+  const selectedType = types.find((t) => t.id === sessionTypeId);
 
   const toggleWeekday = (index: number) => setWeekdays((mask) => mask ^ (1 << index));
 
@@ -80,6 +76,15 @@ export function AddSessionSheet({
       setNewLabel('');
       setNewIcon('');
     }
+  };
+
+  const handleDeleteType = async () => {
+    if (!selectedType?.custom) return;
+    if (!window.confirm(`Kategorie "${selectedType.label}" löschen?`)) return;
+    setSaving(true);
+    const ok = await onDeleteType(selectedType.id);
+    setSaving(false);
+    if (ok) setSessionTypeId(types.find((t) => t.id !== selectedType.id)?.id ?? null);
   };
 
   const incomplete =
@@ -114,10 +119,11 @@ export function AddSessionSheet({
       <h2 className={styles.title}>Termin planen</h2>
       <div className={styles.sub}>Aktivität auswählen und einen Tag festlegen.</div>
 
-      <div className={styles.newTypeRow}>
+      <div className={styles.row}>
         <div className={`${styles.field} ${styles.grow}`}>
-          <label>{repeat === 'once' ? 'Datum' : 'Ab'}</label>
+          <label htmlFor="session-date">{repeat === 'once' ? 'Datum' : 'Ab'}</label>
           <input
+            id="session-date"
             type="date"
             value={selectedDate}
             onChange={(e) => {
@@ -127,8 +133,13 @@ export function AddSessionSheet({
           />
         </div>
         <div className={styles.field}>
-          <label>Zeit</label>
-          <input type="time" value={time} onChange={(e) => setTime(e.target.value)} />
+          <label htmlFor="session-time">Zeit</label>
+          <input
+            id="session-time"
+            type="time"
+            value={time}
+            onChange={(e) => setTime(e.target.value)}
+          />
         </div>
       </div>
 
@@ -154,26 +165,43 @@ export function AddSessionSheet({
             + Neu
           </button>
         </div>
+        {/* Only user-created types can go; the seeded defaults are shared by every account. */}
+        {selectedType?.custom && (
+          <button
+            type="button"
+            className={styles.deleteType}
+            disabled={saving}
+            onClick={handleDeleteType}
+          >
+            „{selectedType.label}“ löschen
+          </button>
+        )}
       </div>
 
       {newTypeOpen && (
         <div className={styles.newType}>
           <div className={styles.field}>
-            <label>Bezeichnung</label>
+            <label htmlFor="type-label">Bezeichnung</label>
             <input
+              id="type-label"
               value={newLabel}
               onChange={(e) => setNewLabel(e.target.value)}
               placeholder="z. B. Klettern"
             />
           </div>
-          <div className={styles.newTypeRow}>
+          <div className={styles.row}>
             <div className={styles.field}>
-              <label>Farbe</label>
-              <input type="color" value={newColor} onChange={(e) => setNewColor(e.target.value)} />
+              <label htmlFor="type-color">Farbe</label>
+              <input
+                id="type-color"
+                type="color"
+                value={newColor}
+                onChange={(e) => setNewColor(e.target.value)}
+              />
             </div>
             <div className={`${styles.field} ${styles.grow}`}>
-              <label>Icon (optional)</label>
-              <input value={newIcon} onChange={(e) => setNewIcon(e.target.value)} />
+              <label htmlFor="type-icon">Icon (optional)</label>
+              <input id="type-icon" value={newIcon} onChange={(e) => setNewIcon(e.target.value)} />
             </div>
           </div>
           <button
@@ -189,8 +217,8 @@ export function AddSessionSheet({
 
       {days.length > 0 && (
         <div className={styles.field}>
-          <label>Workout-Plan (optional)</label>
-          <select value={dayId} onChange={(e) => setDayId(e.target.value)}>
+          <label htmlFor="session-plan">Workout-Plan (optional)</label>
+          <select id="session-plan" value={dayId} onChange={(e) => setDayId(e.target.value)}>
             <option value="">— kein Workout —</option>
             {days.map((d) => (
               <option key={d.id} value={d.id}>
@@ -204,11 +232,11 @@ export function AddSessionSheet({
       <div className={styles.field}>
         <label>Wiederholung</label>
         <div className={styles.chips}>
-          {(['once', 'weekly', 'interval'] as Repeat[]).map((r) => (
+          {REPEATS.map((r) => (
             <button
               key={r}
               type="button"
-              className={`${styles.seg} ${r === repeat ? styles.segOn : ''}`}
+              className={`${styles.segment} ${r === repeat ? styles.segmentOn : ''}`}
               onClick={() => setRepeat(r)}
             >
               {REPEAT_LABEL[r]}
@@ -220,7 +248,7 @@ export function AddSessionSheet({
       {repeat === 'weekly' && (
         <div className={styles.field}>
           <label>An diesen Tagen</label>
-          <div className={styles.weekdays}>
+          <div className={styles.weekdayGrid}>
             {WEEKDAY_SHORT.map((label, index) => (
               <button
                 key={label}
@@ -238,8 +266,9 @@ export function AddSessionSheet({
 
       {repeat === 'interval' && (
         <div className={styles.field}>
-          <label>Abstand in Tagen</label>
+          <label htmlFor="session-interval">Abstand in Tagen</label>
           <input
+            id="session-interval"
             type="number"
             min={1}
             max={365}
@@ -251,14 +280,24 @@ export function AddSessionSheet({
 
       {repeat !== 'once' && (
         <div className={styles.field}>
-          <label>Ende (optional)</label>
-          <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+          <label htmlFor="session-end">Ende (optional)</label>
+          <input
+            id="session-end"
+            type="date"
+            value={endDate}
+            onChange={(e) => setEndDate(e.target.value)}
+          />
         </div>
       )}
 
       <div className={styles.field}>
-        <label>Notiz (optional)</label>
-        <textarea rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} />
+        <label htmlFor="session-notes">Notiz (optional)</label>
+        <textarea
+          id="session-notes"
+          rows={3}
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+        />
       </div>
 
       <button type="button" className={styles.solid} onClick={handleSubmit} disabled={incomplete}>

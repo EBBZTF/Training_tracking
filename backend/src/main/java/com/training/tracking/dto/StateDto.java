@@ -1,9 +1,11 @@
 package com.training.tracking.dto;
 
+import jakarta.validation.Valid;
+
 import java.util.List;
 
 public record StateDto(
-        PlanDto plan,
-        List<SessionDto> logs
+        @Valid PlanDto plan,
+        List<@Valid SessionDto> logs
 ) {
 }

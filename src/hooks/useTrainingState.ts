@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useState } from 'react';
-import type { AppState, BlockRef, Day, Exercise, Side, Slot } from '../types';
-import { attachDesc, emptyPlan, uid } from '../data/plan';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import type { AppState, BlockKind, BlockRef, Day, Exercise, Side, Slot } from '../types';
+import { emptyPlan, uid } from '../data/plan';
 import { loadState, saveState } from '../api/client';
+import type { ExerciseSetsField, ExerciseTextField } from '../state/planOps';
 import * as planOps from '../state/planOps';
-import * as sessionOps from '../state/sessionOps';
+import * as logOps from '../state/logOps';
 
 /** Which day is being looked at: the date logs are written under, and the plan shown for it. */
 export interface Selection {
@@ -11,18 +12,21 @@ export interface Selection {
   dayId: string;
 }
 
+export interface DayInput {
+  title: string;
+  short: string;
+  slot: Slot;
+}
+
 /**
  * Plan and logs for the selected day. The selection itself is controlled by the caller, because in
  * log mode it follows what the calendar has scheduled and in edit mode it follows the plan list.
  */
 export function useTrainingState(notify: (message: string) => void, selection: Selection) {
-  const [state, setState] = useState<AppState>(() => ({
-    plan: emptyPlan(),
-    logs: [],
-  }));
+  const [state, setState] = useState<AppState>(() => ({ plan: emptyPlan(), logs: [] }));
   const [open, setOpen] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
-  const { date: today, dayId } = selection;
+  const { date: selectedDate, dayId } = selection;
 
   const persist = useCallback(
     async (next: AppState) => {
@@ -32,27 +36,20 @@ export function useTrainingState(notify: (message: string) => void, selection: S
     [notify],
   );
 
+  // `notify` is stable, so this loads once on mount.
   useEffect(() => {
     let cancelled = false;
     (async () => {
       const data = await loadState();
       if (cancelled) return;
-      if (data && data.plan) {
-        setState({ plan: attachDesc(data.plan), logs: data.logs });
-      } else if (data) {
-        // Brand-new user: nothing saved yet. Stay empty and write nothing — the account only gets
-        // a plan once she creates one, which is what the onboarding check keys off.
-        setState({ plan: emptyPlan(), logs: data.logs });
-      } else {
-        notify('Laden fehlgeschlagen — Backend erreichbar?');
-      }
+      if (data) setState({ plan: data.plan ?? emptyPlan(), logs: data.logs ?? [] });
+      else notify('Laden fehlgeschlagen — Backend erreichbar?');
       setReady(true);
     })();
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [persist]);
+  }, [notify]);
 
   const updatePlan = useCallback(
     (updater: (p: AppState['plan']) => AppState['plan']) => {
@@ -78,7 +75,7 @@ export function useTrainingState(notify: (message: string) => void, selection: S
 
   const importState = useCallback(
     (data: AppState) => {
-      const next = { plan: attachDesc(data.plan), logs: data.logs };
+      const next = { plan: data.plan, logs: data.logs };
       setState(next);
       void persist(next);
     },
@@ -87,27 +84,48 @@ export function useTrainingState(notify: (message: string) => void, selection: S
 
   const resetPlan = useCallback(() => updatePlan(emptyPlan), [updatePlan]);
 
-  const addExercise = useCallback(
-    (ref: BlockRef) => updatePlan((p) => planOps.addExercise(p, ref)),
+  /** Returns the new plan so the caller can select it. */
+  const addDay = useCallback(
+    (input: DayInput) => {
+      const day: Day = { id: uid(), ...input, blocks: [] };
+      updatePlan((p) => planOps.addDay(p, day));
+      return day;
+    },
     [updatePlan],
   );
+  const updateDay = useCallback(
+    (targetDayId: string, input: DayInput) =>
+      updatePlan((p) => planOps.updateDay(p, targetDayId, input)),
+    [updatePlan],
+  );
+  const deleteDay = useCallback(
+    (targetDayId: string) => updatePlan((p) => planOps.deleteDay(p, targetDayId)),
+    [updatePlan],
+  );
+
   const addBlock = useCallback(
     (forDayId: string) => updatePlan((p) => planOps.addBlockToDay(p, forDayId)),
     [updatePlan],
   );
-  /** Returns the new plan so the caller can select it. */
-  const addDay = useCallback(
-    (input: { title: string; short: string; slot: Slot }) => {
-      const day: Day = {
-        id: uid(),
-        short: input.short,
-        slot: input.slot,
-        title: input.title,
-        blocks: [],
-      };
-      updatePlan((p) => planOps.addDay(p, day));
-      return day;
-    },
+  const deleteBlock = useCallback(
+    (ref: BlockRef) => updatePlan((p) => planOps.deleteBlock(p, ref)),
+    [updatePlan],
+  );
+  const moveBlock = useCallback(
+    (ref: BlockRef, dir: -1 | 1) => updatePlan((p) => planOps.moveBlock(p, ref, dir)),
+    [updatePlan],
+  );
+  const setBlockName = useCallback(
+    (ref: BlockRef, name: string) => updatePlan((p) => planOps.setBlockName(p, ref, name)),
+    [updatePlan],
+  );
+  const setBlockKind = useCallback(
+    (ref: BlockRef, kind: BlockKind) => updatePlan((p) => planOps.setBlockKind(p, ref, kind)),
+    [updatePlan],
+  );
+
+  const addExercise = useCallback(
+    (ref: BlockRef) => updatePlan((p) => planOps.addExercise(p, ref)),
     [updatePlan],
   );
   const deleteExercise = useCallback(
@@ -130,15 +148,16 @@ export function useTrainingState(notify: (message: string) => void, selection: S
     [updatePlan],
   );
   const setExerciseText = useCallback(
-    (ref: BlockRef, exId: string, field: 'name' | 'reps' | 'note' | 'desc', value: string) =>
+    (ref: BlockRef, exId: string, field: ExerciseTextField, value: string) =>
       updatePlan((p) => planOps.setExerciseText(p, ref, exId, field, value)),
     [updatePlan],
   );
   const setExerciseSets = useCallback(
-    (ref: BlockRef, exId: string, field: 'sets' | 'setsL' | 'setsR', value: number) =>
+    (ref: BlockRef, exId: string, field: ExerciseSetsField, value: number) =>
       updatePlan((p) => planOps.setExerciseSets(p, ref, exId, field, value)),
     [updatePlan],
   );
+
   const addWarmupItem = useCallback(
     () => updatePlan((p) => planOps.addWarmupItem(p)),
     [updatePlan],
@@ -158,46 +177,56 @@ export function useTrainingState(notify: (message: string) => void, selection: S
 
   const setVal = useCallback(
     (exId: string, side: Side, i: number, value: string) =>
-      updateLogs((l) => sessionOps.setVal(l, today, dayId, exId, side, i, value)),
-    [updateLogs, today, dayId],
+      updateLogs((l) => logOps.setVal(l, selectedDate, dayId, exId, side, i, value)),
+    [updateLogs, selectedDate, dayId],
   );
   const toggleWarmupItem = useCallback(
-    (index: number) => updateLogs((l) => sessionOps.toggleWarmup(l, today, dayId, index)),
-    [updateLogs, today, dayId],
+    (index: number) => updateLogs((l) => logOps.toggleWarmup(l, selectedDate, dayId, index)),
+    [updateLogs, selectedDate, dayId],
+  );
+
+  const log = useMemo(
+    () => logOps.findLog(state.logs, selectedDate, dayId),
+    [state.logs, selectedDate, dayId],
+  );
+  const previous = useMemo(
+    () => logOps.lastValues(state.logs, selectedDate),
+    [state.logs, selectedDate],
   );
 
   const getVal = useCallback(
-    (exId: string, side: Side, i: number) =>
-      sessionOps.getVal(state.logs, today, dayId, exId, side, i),
-    [state.logs, today, dayId],
+    (exId: string, side: Side, i: number) => logOps.getVal(log, exId, side, i),
+    [log],
   );
   const lastVal = useCallback(
-    (exId: string, side: Side, i: number) => sessionOps.lastVal(state.logs, today, exId, side, i),
-    [state.logs, today],
+    (exId: string, side: Side, i: number) => previous.get(logOps.positionKey(exId, side, i)) ?? '',
+    [previous],
   );
-
-  const day = planOps.curDay(state.plan, dayId);
-  const session = sessionOps.findSession(state.logs, today, dayId);
 
   return {
     plan: state.plan,
     logs: state.logs,
     dayId,
-    today,
+    selectedDate,
     open,
     ready,
-    day,
-    session,
-    blocks: planOps.allBlocksForDay(state.plan, day),
+    day: planOps.curDay(state.plan, dayId),
+    log,
     findExercise: (id: string) => planOps.findExercise(state.plan, id),
     setOpen,
     getVal,
     lastVal,
     setVal,
     toggleWarmupItem,
-    addExercise,
-    addBlock,
     addDay,
+    updateDay,
+    deleteDay,
+    addBlock,
+    deleteBlock,
+    moveBlock,
+    setBlockName,
+    setBlockKind,
+    addExercise,
     deleteExercise,
     moveExercise,
     setExerciseUni,
@@ -212,5 +241,3 @@ export function useTrainingState(notify: (message: string) => void, selection: S
     importState,
   };
 }
-
-export type TrainingState = ReturnType<typeof useTrainingState>;

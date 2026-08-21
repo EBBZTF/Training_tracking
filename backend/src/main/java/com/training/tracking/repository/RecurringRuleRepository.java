@@ -7,11 +7,8 @@ import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDate;
 import java.util.List;
-import java.util.Optional;
 
 public interface RecurringRuleRepository extends JpaRepository<RecurringRule, Long> {
-
-    Optional<RecurringRule> findByIdAndUserId(Long id, Long userId);
 
     /** Rules whose active window overlaps [from, to]. */
     @Query("""

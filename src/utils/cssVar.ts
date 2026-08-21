@@ -1,12 +1,33 @@
 import type { CSSProperties } from 'react';
 import type { BlockKind, SessionType } from '../types';
 
-/** The accent color CSS custom property (`--k`) a block's chrome reads from. */
-export function blockAccent(kind: BlockKind): CSSProperties {
-  return { '--k': `var(--${kind})` } as CSSProperties;
+/** The name of the custom property every accent-aware component reads its highlight from. */
+const ACCENT = '--k';
+
+function accent(value: string): CSSProperties {
+  return { [ACCENT]: value } as CSSProperties;
 }
 
-/** The accent color CSS custom property (`--k`) a session type's chip/pill chrome reads from. */
+/** The accent color a block's chrome reads from. */
+export function blockAccent(kind: BlockKind): CSSProperties {
+  return accent(`var(--${kind})`);
+}
+
+/** The accent color a session type's chip/pill chrome reads from. */
 export function sessionTypeAccent(type: SessionType | undefined): CSSProperties {
-  return { '--k': type?.color || 'var(--faint)' } as CSSProperties;
+  return accent(type?.color || 'var(--faint)');
+}
+
+/** An accent taken straight from a stored color, for a tab whose type is already resolved. */
+export function colorAccent(color: string): CSSProperties {
+  return accent(color);
+}
+
+/**
+ * The default color offered when creating a session type, read from the stylesheet so the palette
+ * stays defined in exactly one place (`styles/global.scss`).
+ */
+export function defaultSessionTypeColor(): string {
+  const token = getComputedStyle(document.documentElement).getPropertyValue('--skill').trim();
+  return token || '#5b9bc9';
 }

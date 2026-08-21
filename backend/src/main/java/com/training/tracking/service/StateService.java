@@ -22,23 +22,31 @@ import com.training.tracking.repository.SessionRepository;
 import com.training.tracking.repository.SessionValueRepository;
 import com.training.tracking.repository.SessionWarmupRepository;
 import com.training.tracking.repository.WarmupItemRepository;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
-import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
+import java.util.Set;
 
 /**
  * The whole state (plan + logs) for one user is saved as one blob, mirroring the frontend's
  * single persist() call. saveState wipes and re-inserts that user's rows rather than diffing —
  * the data volume per user is small.
+ *
+ * <p>Logs reference their plan by {@code day_key} rather than a FK, so the history survives both
+ * the wipe-and-reinsert and the plan itself being deleted.
  */
 @Service
 public class StateService {
+
+    private static final Set<String> VALID_SIDES = Set.of("B", "L", "R");
+    private static final int MAX_VALUE_LENGTH = 64;
 
     private final DayRepository dayRepository;
     private final BlockRepository blockRepository;
@@ -66,16 +74,12 @@ public class StateService {
 
     @Transactional(readOnly = true)
     public StateDto getState(Long userId) {
-        List<Day> days = dayRepository.findAllByUserIdOrderByPosition(userId);
-        if (days.isEmpty()) {
-            return new StateDto(null, List.of());
-        }
-
-        List<Block> blocks = blockRepository.findAllByUserIdOrderByPosition(userId);
-        List<Exercise> exercises = exerciseRepository.findAllByBlock_UserIdOrderByPosition(userId);
         List<String> warmup = warmupItemRepository.findAllByUserIdOrderByPosition(userId).stream()
                 .map(WarmupItem::getText)
                 .toList();
+        List<Day> days = dayRepository.findAllByUserIdOrderByPosition(userId);
+        List<Block> blocks = blockRepository.findAllByUserIdOrderByPosition(userId);
+        List<Exercise> exercises = exerciseRepository.findAllByBlock_UserIdOrderByPosition(userId);
 
         Map<Long, List<ExerciseDto>> exercisesByBlock = new LinkedHashMap<>();
         Map<Long, String> clientIdByExerciseId = new LinkedHashMap<>();
@@ -84,16 +88,11 @@ public class StateService {
             clientIdByExerciseId.put(ex.getId(), ex.getClientId());
         }
 
-        BlockDto hip = null;
         Map<Long, List<BlockDto>> blocksByDay = new LinkedHashMap<>();
         for (Block b : blocks) {
-            BlockDto dto = new BlockDto(b.getKind(), b.getName(),
-                    exercisesByBlock.getOrDefault(b.getId(), List.of()));
-            if (b.isShared()) {
-                hip = dto;
-            } else {
-                blocksByDay.computeIfAbsent(b.getDay().getId(), k -> new ArrayList<>()).add(dto);
-            }
+            blocksByDay.computeIfAbsent(b.getDay().getId(), k -> new ArrayList<>())
+                    .add(new BlockDto(b.getKind(), b.getName(),
+                            exercisesByBlock.getOrDefault(b.getId(), List.of())));
         }
 
         List<DayDto> dayDtos = days.stream()
@@ -101,7 +100,7 @@ public class StateService {
                         blocksByDay.getOrDefault(d.getId(), List.of())))
                 .toList();
 
-        return new StateDto(new PlanDto(warmup, hip, dayDtos), buildLogs(userId, clientIdByExerciseId));
+        return new StateDto(new PlanDto(warmup, dayDtos), buildLogs(userId, clientIdByExerciseId));
     }
 
     private List<SessionDto> buildLogs(Long userId, Map<Long, String> clientIdByExerciseId) {
@@ -123,111 +122,157 @@ public class StateService {
 
         List<SessionDto> result = new ArrayList<>();
         for (Session s : sessions) {
-            List<Integer> checked = warmupBySession.getOrDefault(s.getId(), List.of());
-            int maxPos = checked.stream().mapToInt(Integer::intValue).max().orElse(-1);
-            List<Boolean> warm = new ArrayList<>();
-            for (int i = 0; i <= maxPos; i++) {
-                warm.add(false);
-            }
-            checked.forEach(pos -> warm.set(pos, true));
-
-            Map<String, Map<String, List<String>>> vals = new LinkedHashMap<>();
-            for (SessionValue sv : valuesBySession.getOrDefault(s.getId(), List.of())) {
-                String clientId = clientIdByExerciseId.get(sv.getId().getExerciseId());
-                if (clientId == null) {
-                    continue; // exercise no longer exists in the current plan
-                }
-                Map<String, List<String>> bySide = vals.computeIfAbsent(clientId, k -> new LinkedHashMap<>());
-                List<String> setValues = bySide.computeIfAbsent(sv.getId().getSide(), k -> new ArrayList<>());
-                int idx = sv.getId().getSetIndex();
-                while (setValues.size() <= idx) {
-                    setValues.add("");
-                }
-                setValues.set(idx, sv.getValue());
-            }
-
-            result.add(new SessionDto(s.getSessionDate().toString(), s.getDay().getDayKey(), vals, warm));
+            result.add(new SessionDto(
+                    s.getSessionDate().toString(),
+                    s.getDayKey(),
+                    valuesOf(valuesBySession.getOrDefault(s.getId(), List.of()), clientIdByExerciseId),
+                    warmupFlags(warmupBySession.getOrDefault(s.getId(), List.of()))));
         }
         return result;
     }
 
-    private ExerciseDto toDto(Exercise e) {
+    /** Row presence means checked, so the flag list is only as long as its last checked position. */
+    private static List<Boolean> warmupFlags(List<Integer> checkedPositions) {
+        int size = checkedPositions.stream().mapToInt(Integer::intValue).max().orElse(-1) + 1;
+        List<Boolean> warm = new ArrayList<>(size);
+        for (int i = 0; i < size; i++) {
+            warm.add(false);
+        }
+        checkedPositions.forEach(pos -> warm.set(pos, true));
+        return warm;
+    }
+
+    private static Map<String, Map<String, List<String>>> valuesOf(
+            List<SessionValue> values, Map<Long, String> clientIdByExerciseId) {
+        Map<String, Map<String, List<String>>> vals = new LinkedHashMap<>();
+        for (SessionValue sv : values) {
+            String clientId = clientIdByExerciseId.get(sv.getId().getExerciseId());
+            if (clientId == null) {
+                continue; // exercise no longer exists in the current plan
+            }
+            List<String> setValues = vals
+                    .computeIfAbsent(clientId, k -> new LinkedHashMap<>())
+                    .computeIfAbsent(sv.getId().getSide(), k -> new ArrayList<>());
+            int idx = sv.getId().getSetIndex();
+            while (setValues.size() <= idx) {
+                setValues.add("");
+            }
+            setValues.set(idx, sv.getValue());
+        }
+        return vals;
+    }
+
+    private static ExerciseDto toDto(Exercise e) {
         return new ExerciseDto(e.getClientId(), e.getName(), e.getType(), e.isUni(),
                 e.getSets(), e.getSetsL(), e.getSetsR(), e.getReps(), e.getNote(), e.getDescription());
     }
 
     @Transactional
     public void saveState(Long userId, StateDto state) {
-        sessionRepository.deleteAllInBatch(sessionRepository.findAllByUserId(userId));
-        exerciseRepository.deleteAllInBatch(exerciseRepository.findAllByBlock_UserIdOrderByPosition(userId));
-        blockRepository.deleteAllInBatch(blockRepository.findAllByUserIdOrderByPosition(userId));
-        dayRepository.deleteAllInBatch(dayRepository.findAllByUserIdOrderByPosition(userId));
-        warmupItemRepository.deleteAllInBatch(warmupItemRepository.findAllByUserIdOrderByPosition(userId));
+        PlanDto plan = state.plan() == null ? new PlanDto(List.of(), List.of()) : state.plan();
+        List<DayDto> dayDtos = plan.days() == null ? List.of() : plan.days();
+        List<SessionDto> logDtos = state.logs() == null ? List.of() : state.logs();
+        rejectAmbiguousKeys(dayDtos, logDtos);
 
-        if (state.plan() == null) {
-            return;
-        }
-        PlanDto plan = state.plan();
+        wipe(userId);
 
         warmupItemRepository.saveAllAndFlush(toWarmupItems(userId, plan.warmup()));
 
-        List<DayDto> dayDtos = plan.days() == null ? List.of() : plan.days();
         List<Day> days = new ArrayList<>();
         for (int i = 0; i < dayDtos.size(); i++) {
             days.add(toDay(userId, dayDtos.get(i), i));
         }
         dayRepository.saveAllAndFlush(days);
-        Map<String, Day> dayByKey = days.stream().collect(Collectors.toMap(Day::getDayKey, x -> x));
+
+        Map<String, Exercise> exerciseByClientId = saveBlocksAndExercises(userId, dayDtos, days);
+        saveLogs(userId, logDtos, exerciseByClientId);
+    }
+
+    /**
+     * Clears this user's plan and logs, children before parents. The order is explicit rather than
+     * delegated to ON DELETE CASCADE so it holds whatever created the schema.
+     */
+    private void wipe(Long userId) {
+        sessionValueRepository.deleteAllByUserId(userId);
+        sessionWarmupRepository.deleteAllByUserId(userId);
+        sessionRepository.deleteAllInBatch(sessionRepository.findAllByUserId(userId));
+        exerciseRepository.deleteAllInBatch(exerciseRepository.findAllByBlock_UserIdOrderByPosition(userId));
+        blockRepository.deleteAllInBatch(blockRepository.findAllByUserIdOrderByPosition(userId));
+        dayRepository.deleteAllInBatch(dayRepository.findAllByUserIdOrderByPosition(userId));
+        warmupItemRepository.deleteAllInBatch(warmupItemRepository.findAllByUserIdOrderByPosition(userId));
+    }
+
+    /**
+     * The client addresses plans and exercises by ids it generated itself, so a payload that reuses
+     * one is ambiguous rather than merely invalid — reject it instead of silently keeping one of the
+     * two and binding logged values to the wrong exercise.
+     */
+    private static void rejectAmbiguousKeys(List<DayDto> dayDtos, List<SessionDto> logDtos) {
+        Set<String> dayIds = new HashSet<>();
+        Set<String> exerciseIds = new HashSet<>();
+        for (DayDto day : dayDtos) {
+            if (!dayIds.add(day.id())) {
+                throw badRequest("duplicate day id " + day.id());
+            }
+            for (BlockDto block : nullToEmpty(day.blocks())) {
+                for (ExerciseDto ex : nullToEmpty(block.ex())) {
+                    if (!exerciseIds.add(ex.id())) {
+                        throw badRequest("duplicate exercise id " + ex.id());
+                    }
+                }
+            }
+        }
+        Set<String> logKeys = new HashSet<>();
+        for (SessionDto log : logDtos) {
+            if (!logKeys.add(log.date() + "/" + log.dayId())) {
+                throw badRequest("duplicate log for " + log.date() + " / " + log.dayId());
+            }
+        }
+    }
+
+    private Map<String, Exercise> saveBlocksAndExercises(Long userId, List<DayDto> dayDtos, List<Day> days) {
+        Map<String, Day> dayByKey = new LinkedHashMap<>();
+        days.forEach(d -> dayByKey.put(d.getDayKey(), d));
 
         List<Block> blocks = new ArrayList<>();
         List<List<ExerciseDto>> exercisesPerBlock = new ArrayList<>();
-        if (plan.hip() != null) {
-            Block hipBlock = new Block();
-            hipBlock.setUserId(userId);
-            hipBlock.setShared(true);
-            hipBlock.setKind(plan.hip().kind());
-            hipBlock.setName(plan.hip().name());
-            hipBlock.setPosition(0);
-            blocks.add(hipBlock);
-            exercisesPerBlock.add(plan.hip().ex() == null ? List.of() : plan.hip().ex());
-        }
         for (DayDto d : dayDtos) {
-            Day day = dayByKey.get(d.id());
-            List<BlockDto> dayBlocks = d.blocks() == null ? List.of() : d.blocks();
+            List<BlockDto> dayBlocks = nullToEmpty(d.blocks());
             for (int i = 0; i < dayBlocks.size(); i++) {
                 BlockDto bDto = dayBlocks.get(i);
                 Block block = new Block();
                 block.setUserId(userId);
-                block.setDay(day);
-                block.setShared(false);
+                block.setDay(dayByKey.get(d.id()));
                 block.setKind(bDto.kind());
                 block.setName(bDto.name());
                 block.setPosition(i);
                 blocks.add(block);
-                exercisesPerBlock.add(bDto.ex() == null ? List.of() : bDto.ex());
+                exercisesPerBlock.add(nullToEmpty(bDto.ex()));
             }
         }
         blockRepository.saveAllAndFlush(blocks);
 
         List<Exercise> exercises = new ArrayList<>();
         for (int bi = 0; bi < blocks.size(); bi++) {
-            Block block = blocks.get(bi);
             List<ExerciseDto> exDtos = exercisesPerBlock.get(bi);
             for (int i = 0; i < exDtos.size(); i++) {
-                exercises.add(toExercise(exDtos.get(i), block, i));
+                exercises.add(toExercise(exDtos.get(i), blocks.get(bi), i));
             }
         }
         exerciseRepository.saveAllAndFlush(exercises);
-        Map<String, Exercise> exerciseByClientId = exercises.stream()
-                .collect(Collectors.toMap(Exercise::getClientId, x -> x, (a, b) -> a));
 
-        List<SessionDto> logDtos = state.logs() == null ? List.of() : state.logs();
+        Map<String, Exercise> byClientId = new LinkedHashMap<>();
+        exercises.forEach(ex -> byClientId.put(ex.getClientId(), ex));
+        return byClientId;
+    }
+
+    private void saveLogs(Long userId, List<SessionDto> logDtos, Map<String, Exercise> exerciseByClientId) {
         List<Session> sessions = new ArrayList<>();
         for (SessionDto logDto : logDtos) {
             Session session = new Session();
             session.setUserId(userId);
-            session.setSessionDate(LocalDate.parse(logDto.date()));
-            session.setDay(dayByKey.get(logDto.dayId()));
+            session.setSessionDate(ScheduleRefs.parseDate(logDto.date()));
+            session.setDayKey(logDto.dayId());
             sessions.add(session);
         }
         sessionRepository.saveAllAndFlush(sessions);
@@ -243,7 +288,7 @@ public class StateService {
     }
 
     private List<WarmupItem> toWarmupItems(Long userId, List<String> warmup) {
-        List<String> texts = warmup == null ? List.of() : warmup;
+        List<String> texts = nullToEmpty(warmup);
         List<WarmupItem> items = new ArrayList<>();
         for (int i = 0; i < texts.size(); i++) {
             WarmupItem item = new WarmupItem();
@@ -284,7 +329,7 @@ public class StateService {
     }
 
     private void collectWarmups(SessionDto logDto, Session session, List<SessionWarmup> out) {
-        List<Boolean> warm = logDto.warm() == null ? List.of() : logDto.warm();
+        List<Boolean> warm = nullToEmpty(logDto.warm());
         for (int pos = 0; pos < warm.size(); pos++) {
             if (Boolean.TRUE.equals(warm.get(pos))) {
                 SessionWarmup sw = new SessionWarmup();
@@ -304,14 +349,21 @@ public class StateService {
                 continue; // exercise no longer exists in the submitted plan
             }
             for (Map.Entry<String, List<String>> sideEntry : exEntry.getValue().entrySet()) {
-                List<String> setValues = sideEntry.getValue();
+                String side = sideEntry.getKey();
+                if (!VALID_SIDES.contains(side)) {
+                    throw badRequest("side must be one of " + VALID_SIDES + ", got " + side);
+                }
+                List<String> setValues = nullToEmpty(sideEntry.getValue());
                 for (int setIdx = 0; setIdx < setValues.size(); setIdx++) {
                     String value = setValues.get(setIdx);
                     if (value == null || value.isEmpty()) {
                         continue;
                     }
+                    if (value.length() > MAX_VALUE_LENGTH) {
+                        throw badRequest("logged value must be at most " + MAX_VALUE_LENGTH + " characters");
+                    }
                     SessionValue sv = new SessionValue();
-                    sv.setId(new SessionValueId(session.getId(), exercise.getId(), sideEntry.getKey(), setIdx));
+                    sv.setId(new SessionValueId(session.getId(), exercise.getId(), side, setIdx));
                     sv.setSession(session);
                     sv.setExercise(exercise);
                     sv.setValue(value);
@@ -319,5 +371,13 @@ public class StateService {
                 }
             }
         }
+    }
+
+    private static <T> List<T> nullToEmpty(List<T> list) {
+        return list == null ? List.of() : list;
+    }
+
+    private static ResponseStatusException badRequest(String message) {
+        return new ResponseStatusException(HttpStatus.BAD_REQUEST, message);
     }
 }

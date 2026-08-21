@@ -1,23 +1,15 @@
 import { useState } from 'react';
-import type { RecurrencePattern, SessionType } from '../../types';
-import { sessionTypeAccent } from '../../utils/cssVar';
+import type { NewRecurringRule, RecurrencePattern, SessionType } from '../../types';
+import { defaultSessionTypeColor, sessionTypeAccent } from '../../utils/cssVar';
 import { WEEKDAY_SHORT } from '../../utils/date';
 import styles from './Onboarding.module.scss';
 
 interface OnboardingProps {
   types: SessionType[];
-  today: string;
+  /** The date the generated series start on. */
+  startDate: string;
   onAddType: (input: { label: string; color?: string }) => Promise<SessionType | null>;
-  onFinish: (
-    rules: {
-      sessionTypeId: number;
-      time?: string;
-      pattern: RecurrencePattern;
-      weekdays?: number;
-      intervalDays?: number;
-      startDate: string;
-    }[],
-  ) => Promise<void>;
+  onFinish: (rules: NewRecurringRule[]) => Promise<void>;
   onSkip: () => void;
 }
 
@@ -31,7 +23,8 @@ interface Draft {
 }
 
 const MONDAY = 1;
-const NEW_TYPE_COLOR = '#5b9bc9';
+const DEFAULT_INTERVAL_DAYS = 3;
+const STEPS = 3;
 
 function describe(draft: Draft): string {
   if (draft.pattern === 'interval') {
@@ -43,7 +36,7 @@ function describe(draft: Draft): string {
   return draft.time ? `${when}, ${draft.time}` : when;
 }
 
-export function Onboarding({ types, today, onAddType, onFinish, onSkip }: OnboardingProps) {
+export function Onboarding({ types, startDate, onAddType, onFinish, onSkip }: OnboardingProps) {
   const [step, setStep] = useState(0);
   const [drafts, setDrafts] = useState<Draft[]>([]);
   const [newLabel, setNewLabel] = useState('');
@@ -55,7 +48,16 @@ export function Onboarding({ types, today, onAddType, onFinish, onSkip }: Onboar
     setDrafts((prev) =>
       prev.some((d) => d.typeId === typeId)
         ? prev.filter((d) => d.typeId !== typeId)
-        : [...prev, { typeId, pattern: 'weekly', weekdays: MONDAY, intervalDays: 3, time: '' }],
+        : [
+            ...prev,
+            {
+              typeId,
+              pattern: 'weekly',
+              weekdays: MONDAY,
+              intervalDays: DEFAULT_INTERVAL_DAYS,
+              time: '',
+            },
+          ],
     );
 
   const patchDraft = (typeId: number, patch: Partial<Draft>) =>
@@ -65,7 +67,7 @@ export function Onboarding({ types, today, onAddType, onFinish, onSkip }: Onboar
     const label = newLabel.trim();
     if (!label) return;
     setSaving(true);
-    const created = await onAddType({ label, color: NEW_TYPE_COLOR });
+    const created = await onAddType({ label, color: defaultSessionTypeColor() });
     setSaving(false);
     if (created) {
       setNewLabel('');
@@ -82,7 +84,7 @@ export function Onboarding({ types, today, onAddType, onFinish, onSkip }: Onboar
         pattern: d.pattern,
         weekdays: d.pattern === 'weekly' ? d.weekdays : undefined,
         intervalDays: d.pattern === 'interval' ? d.intervalDays : undefined,
-        startDate: today,
+        startDate,
       })),
     );
     setSaving(false);
@@ -96,7 +98,7 @@ export function Onboarding({ types, today, onAddType, onFinish, onSkip }: Onboar
     <div className={styles.overlay}>
       <div className={styles.body}>
         <div className={styles.steps}>
-          {[0, 1, 2].map((i) => (
+          {Array.from({ length: STEPS }, (_, i) => (
             <span key={i} className={`${styles.stepDot} ${i <= step ? styles.stepDotOn : ''}`} />
           ))}
         </div>
@@ -174,7 +176,7 @@ export function Onboarding({ types, today, onAddType, onFinish, onSkip }: Onboar
                   </div>
 
                   {draft.pattern === 'weekly' ? (
-                    <div className={styles.weekdays}>
+                    <div className={styles.weekdayGrid}>
                       {WEEKDAY_SHORT.map((label, index) => (
                         <button
                           key={label}
@@ -223,7 +225,7 @@ export function Onboarding({ types, today, onAddType, onFinish, onSkip }: Onboar
           </>
         )}
 
-        {step === 2 && (
+        {step === STEPS - 1 && (
           <>
             <div className={styles.eyebrow}>Schritt 3 von 3</div>
             <h1 className={styles.title}>Das kommt in deinen Kalender</h1>
@@ -263,7 +265,7 @@ export function Onboarding({ types, today, onAddType, onFinish, onSkip }: Onboar
       </div>
 
       <div className={styles.footer}>
-        {step < 2 ? (
+        {step < STEPS - 1 ? (
           <button
             type="button"
             className={styles.solid}

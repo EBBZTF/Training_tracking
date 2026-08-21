@@ -3,6 +3,7 @@ package com.training.tracking.web;
 import com.training.tracking.dto.StateDto;
 import com.training.tracking.security.UserPrincipal;
 import com.training.tracking.service.StateService;
+import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -28,7 +29,7 @@ public class StateController {
 
     @PutMapping
     public ResponseEntity<Void> putState(@AuthenticationPrincipal UserPrincipal principal,
-                                          @RequestBody StateDto state) {
+                                          @Valid @RequestBody StateDto state) {
         stateService.saveState(principal.id(), state);
         return ResponseEntity.noContent().build();
     }

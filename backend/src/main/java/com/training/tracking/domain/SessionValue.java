@@ -26,7 +26,8 @@ public class SessionValue {
     @JoinColumn(name = "exercise_id")
     private Exercise exercise;
 
-    @Column(nullable = false, length = 64)
+    /** Backtick-quoted because `value` is a reserved word in H2 (used by the test profile). */
+    @Column(name = "`value`", nullable = false, length = 64)
     private String value;
 
     public SessionValueId getId() { return id; }

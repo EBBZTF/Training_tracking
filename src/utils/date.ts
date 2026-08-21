@@ -3,6 +3,11 @@ export function isoDate(d: Date): string {
   return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
 }
 
+/** Heute als `YYYY-MM-DD`. */
+export function today(): string {
+  return isoDate(new Date());
+}
+
 /** Montag=0 … Sonntag=6, unabhängig von der Locale (`Date#getDay()` liefert Sonntag=0). */
 function mondayIndex(d: Date): number {
   return (d.getDay() + 6) % 7;
@@ -13,6 +18,12 @@ function addDays(d: Date, days: number): Date {
   const next = new Date(d);
   next.setDate(next.getDate() + days);
   return next;
+}
+
+/** `YYYY-MM-DD` als lokales Datum, ohne die UTC-Verschiebung von `new Date(iso)`. */
+function parseIso(iso: string): Date {
+  const [y, m, d] = iso.split('-').map(Number);
+  return new Date(y, m - 1, d);
 }
 
 /** Erster Tag des 6×7-Rasters (montagsbeginnend) für den Monat, der `d` enthält. */
@@ -47,12 +58,6 @@ export function formatMonthLabel(d: Date): string {
 
 /** Wochentagskürzel, montagsbeginnend — passend zum Kalenderraster. */
 export const WEEKDAY_SHORT = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
-
-/** `YYYY-MM-DD` als lokales Datum, ohne die UTC-Verschiebung von `new Date(iso)`. */
-export function parseIso(iso: string): Date {
-  const [y, m, d] = iso.split('-').map(Number);
-  return new Date(y, m - 1, d);
-}
 
 /** Bit eines Wochentags in der Maske einer wöchentlichen Regel: Mo=1, Di=2 … So=64. */
 export function weekdayBit(iso: string): number {

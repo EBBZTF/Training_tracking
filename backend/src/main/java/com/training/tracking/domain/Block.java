@@ -22,12 +22,10 @@ public class Block {
     private Long userId;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "day_id")
+    @JoinColumn(name = "day_id", nullable = false)
     private Day day;
 
-    @Column(name = "is_shared", nullable = false)
-    private boolean shared;
-
+    /** One of the BlockKind values the client offers; DB CHECK enforces valid values. */
     @Column(nullable = false, length = 32)
     private String kind;
 
@@ -45,9 +43,6 @@ public class Block {
 
     public Day getDay() { return day; }
     public void setDay(Day day) { this.day = day; }
-
-    public boolean isShared() { return shared; }
-    public void setShared(boolean shared) { this.shared = shared; }
 
     public String getKind() { return kind; }
     public void setKind(String kind) { this.kind = kind; }

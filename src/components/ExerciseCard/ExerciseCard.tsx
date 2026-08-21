@@ -1,4 +1,4 @@
-import type { Exercise, Side } from '../../types';
+import type { Exercise, ExerciseType, Side } from '../../types';
 import { UNIT } from '../../data/constants';
 import { ExerciseTrack } from '../ExerciseTrack/ExerciseTrack';
 import styles from './ExerciseCard.module.scss';
@@ -8,7 +8,16 @@ interface ExerciseCardProps {
   getVal: (exId: string, side: Side, i: number) => string;
   lastVal: (exId: string, side: Side, i: number) => string;
   onOpenInfo: (exId: string) => void;
-  onOpenEntry: (exId: string, side: Side, i: number, name: string, type: Exercise['type']) => void;
+  onOpenEntry: (exId: string, side: Side, i: number, name: string, type: ExerciseType) => void;
+}
+
+/** Which side gets its own row of set chips, and how many sets each has. */
+function tracks(x: Exercise): { side: Side; count: number }[] {
+  if (!x.uni) return [{ side: 'B', count: x.sets }];
+  return [
+    { side: 'L' as Side, count: x.setsL },
+    { side: 'R' as Side, count: x.setsR },
+  ].filter((t) => t.count > 0);
 }
 
 export function ExerciseCard({
@@ -18,16 +27,14 @@ export function ExerciseCard({
   onOpenInfo,
   onOpenEntry,
 }: ExerciseCardProps) {
-  const spec = x.uni
-    ? `${x.setsL || 0}/${x.setsR || 0} × ${x.reps}  ·  ${UNIT[x.type]}`
-    : `${x.sets} × ${x.reps}  ·  ${UNIT[x.type]}`;
+  const sets = x.uni ? `${x.setsL || 0}/${x.setsR || 0}` : `${x.sets}`;
 
   return (
-    <div className={styles.ex}>
-      <div className={styles.etop}>
-        <div>
-          <div className={styles.ename}>{x.name}</div>
-          <div className={styles.espec}>{spec}</div>
+    <div className={styles.exercise}>
+      <div className={styles.head}>
+        <div className={styles.heading}>
+          <div className={styles.name}>{x.name}</div>
+          <div className={styles.spec}>{`${sets} × ${x.reps}  ·  ${UNIT[x.type]}`}</div>
         </div>
         {x.desc && (
           <button
@@ -41,47 +48,21 @@ export function ExerciseCard({
         )}
       </div>
 
-      {x.uni ? (
-        <>
-          {x.setsL > 0 && (
-            <ExerciseTrack
-              exId={x.id}
-              name={x.name}
-              type={x.type}
-              side="L"
-              count={x.setsL}
-              getVal={getVal}
-              lastVal={lastVal}
-              onOpenEntry={onOpenEntry}
-            />
-          )}
-          {x.setsR > 0 && (
-            <ExerciseTrack
-              exId={x.id}
-              name={x.name}
-              type={x.type}
-              side="R"
-              count={x.setsR}
-              getVal={getVal}
-              lastVal={lastVal}
-              onOpenEntry={onOpenEntry}
-            />
-          )}
-        </>
-      ) : (
+      {tracks(x).map(({ side, count }) => (
         <ExerciseTrack
+          key={side}
           exId={x.id}
           name={x.name}
           type={x.type}
-          side="B"
-          count={x.sets}
+          side={side}
+          count={count}
           getVal={getVal}
           lastVal={lastVal}
           onOpenEntry={onOpenEntry}
         />
-      )}
+      ))}
 
-      {x.note && <div className={styles.enote}>{x.note}</div>}
+      {x.note && <div className={styles.note}>{x.note}</div>}
     </div>
   );
 }

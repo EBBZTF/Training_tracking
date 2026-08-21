@@ -12,10 +12,10 @@ The frontend is a React + TypeScript + SCSS single-page app, built with Vite.
 | `src/App.tsx` | Top-level component, wires state to the page |
 | `src/components/` | One folder per UI component, each with its `.tsx` and a co-located `.module.scss` |
 | `src/hooks/useTrainingState.ts` | App state (plan, logs, current day/mode) + persistence |
-| `src/state/` | Pure, immutable update functions over the plan/session data |
-| `src/data/` | Default plan, exercise descriptions, display constants |
-| `src/api/client.ts` | `GET`/`PUT /api/state` against the backend |
-| `src/styles/` | Global CSS (design tokens as CSS custom properties) + shared button styles |
+| `src/state/` | Pure, immutable update functions over the plan (`planOps`) and the logs (`logOps`) |
+| `src/data/` | Display constants (units, block kinds) and the empty starting plan |
+| `src/api/` | Typed calls against the backend; `base.ts` owns auth, refresh and error handling |
+| `src/styles/` | Design tokens as CSS custom properties (`global.scss`) + the primitives components compose from (`shared.module.scss`) |
 | `public/` | Static assets served as-is: icons, and inputs to the PWA plugin |
 | `vite.config.ts` | Build config, incl. `vite-plugin-pwa` (generates the manifest + service worker) |
 | `backend/` | Java (Spring Boot) REST API + Postgres schema — see [`docs/BACKEND.md`](docs/BACKEND.md) |
@@ -33,7 +33,7 @@ The frontend is a React + TypeScript + SCSS single-page app, built with Vite.
    npm install
    npm run dev
    ```
-   The dev server runs on `http://localhost:5500` (matches the backend's default CORS allowlist). `npm run build` produces a static `dist/` you can serve anywhere.
+   The dev server runs on `http://localhost:5500` (matches the backend's default CORS allowlist). `npm run build` produces a static `dist/` you can serve anywhere, and `npm test` runs the unit tests.
 3. Deploying and installing on an iPhone: see [`docs/SETUP.md`](docs/SETUP.md).
 
 Data lives in the Postgres database the backend is configured against — nothing personal is stored in this repo. You can still back up via **Daten → Als JSON exportieren** in the app; that exports whatever the backend currently holds.

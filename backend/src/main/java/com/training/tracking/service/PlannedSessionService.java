@@ -17,12 +17,9 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
-import java.util.Set;
 
 @Service
 public class PlannedSessionService {
-
-    private static final Set<String> VALID_STATUSES = Set.of("planned", "done", "skipped");
 
     /** Widest window a client may ask for, so a stray range cannot materialize years of occurrences. */
     private static final long MAX_RANGE_DAYS = 366;
@@ -75,11 +72,6 @@ public class PlannedSessionService {
                 .toList();
     }
 
-    @Transactional(readOnly = true)
-    public PlannedSessionDto getOne(Long userId, Long id) {
-        return toDto(findOwned(userId, id));
-    }
-
     @Transactional
     public PlannedSessionDto create(Long userId, CreatePlannedSessionRequest request) {
         PlannedSession session = new PlannedSession();
@@ -89,7 +81,7 @@ public class PlannedSessionService {
         session.setSessionType(refs.sessionType(userId, request.sessionTypeId()));
         session.setDayKey(refs.dayKey(userId, request.dayId()));
         session.setNotes(request.notes());
-        session.setStatus("planned");
+        session.setStatus(PlannedSession.STATUS_PLANNED);
         session.setCreatedAt(Instant.now());
         plannedSessionRepository.save(session);
         return toDto(session);
@@ -134,8 +126,9 @@ public class PlannedSessionService {
 
     @Transactional
     public PlannedSessionDto updateStatus(Long userId, Long id, UpdateStatusRequest request) {
-        if (!VALID_STATUSES.contains(request.status())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "status must be one of " + VALID_STATUSES);
+        if (!PlannedSession.STATUSES.contains(request.status())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "status must be one of " + PlannedSession.STATUSES);
         }
         PlannedSession session = findOwned(userId, id);
         session.setStatus(request.status());
@@ -157,8 +150,10 @@ public class PlannedSessionService {
         plannedSessionRepository.delete(session);
     }
 
+    /** Parses the scope first, so an unknown value is rejected even on a session with no series. */
     private static boolean appliesToSeries(PlannedSession session, String scope) {
-        return session.getRule() != null && Scope.of(scope) == Scope.FUTURE;
+        Scope requested = Scope.of(scope);
+        return session.getRule() != null && requested == Scope.FUTURE;
     }
 
     /** Editing a single occurrence takes it out of the series, so the series never restores it. */

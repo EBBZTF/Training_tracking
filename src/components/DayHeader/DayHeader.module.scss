@@ -1,20 +1,17 @@
-.dayhead {
+.dayHeader {
   margin: 18px 16px 0;
 }
 
-.daytitle {
+.dayTitle {
   font-size: 22px;
   font-weight: 650;
   letter-spacing: -0.02em;
 }
 
-.daywarn {
-  margin-top: 8px;
-  background: var(--panel);
-  border-left: 2px solid var(--huefte);
-  border-radius: 0 9px 9px 0;
-  padding: 10px 13px;
-  font-size: 13px;
-  line-height: 1.45;
-  color: var(--mute);
+.daySlot {
+  margin-top: 4px;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--faint);
 }

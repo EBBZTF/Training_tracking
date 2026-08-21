@@ -1,0 +1,20 @@
+.title {
+  composes: sheetTitle from '../../styles/shared.module.scss';
+}
+
+.sub {
+  composes: sheetSub from '../../styles/shared.module.scss';
+}
+
+.solid {
+  composes: solid from '../../styles/shared.module.scss';
+}
+
+.danger {
+  composes: ghost from '../../styles/shared.module.scss';
+  color: var(--kraft);
+}
+
+.field {
+  composes: field from '../../styles/shared.module.scss';
+}

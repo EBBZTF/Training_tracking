@@ -27,7 +27,13 @@ export function clearTokens(): void {
   if (hadSession) onExpired?.();
 }
 
-/** Called once by AuthProvider so a forced logout (e.g. a failed background refresh) updates the UI. */
-export function registerOnExpired(listener: () => void): void {
+/**
+ * Called by AuthProvider so a forced logout (e.g. a failed background refresh) updates the UI.
+ * Returns a function that unregisters the listener again.
+ */
+export function registerOnExpired(listener: () => void): () => void {
   onExpired = listener;
+  return () => {
+    if (onExpired === listener) onExpired = null;
+  };
 }

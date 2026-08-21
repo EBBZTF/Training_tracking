@@ -1,65 +1,30 @@
 .title {
-  composes: h2 from '../Sheet/Sheet.module.scss';
+  composes: sheetTitle from '../../styles/shared.module.scss';
 }
 
 .sub {
-  composes: sub from '../Sheet/Sheet.module.scss';
+  composes: sheetSub from '../../styles/shared.module.scss';
 }
 
 .solid {
   composes: solid from '../../styles/shared.module.scss';
-
-  &:disabled {
-    opacity: 0.5;
-  }
 }
 
 .ghost {
   composes: ghost from '../../styles/shared.module.scss';
-
-  &:disabled {
-    opacity: 0.5;
-  }
 }
 
 .field {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  margin-bottom: 12px;
-
-  label {
-    font-size: 10px;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    color: var(--faint);
-  }
-
-  input,
-  select,
-  textarea {
-    background: var(--panel2);
-    border: 1px solid var(--line);
-    border-radius: 8px;
-    padding: 9px 10px;
-    font-size: 15px;
-    width: 100%;
-  }
-
-  input[type='color'] {
-    padding: 3px;
-    height: 40px;
-  }
-
-  textarea {
-    resize: vertical;
-    line-height: 1.5;
-    font-size: 14px;
-  }
+  composes: field from '../../styles/shared.module.scss';
 
   &.grow {
     flex: 1;
   }
+}
+
+.row {
+  display: flex;
+  gap: 8px;
 }
 
 .chips {
@@ -90,6 +55,26 @@
   }
 }
 
+/* Segmented control for the repeat mode: no session-type accent, so it gets its own on-state. */
+.segment {
+  composes: chip;
+
+  &.segmentOn {
+    background: var(--ink);
+    border-color: var(--ink);
+    color: var(--bg);
+    font-weight: 650;
+  }
+}
+
+.deleteType {
+  align-self: flex-start;
+  margin-top: 4px;
+  padding: 6px 0;
+  color: var(--kraft);
+  font-size: 12.5px;
+}
+
 .newType {
   border: 1px dashed var(--line);
   border-radius: 12px;
@@ -98,41 +83,14 @@
   background: var(--panel);
 }
 
-.newTypeRow {
-  display: flex;
-  gap: 8px;
-}
-
-/* Segmented control for the repeat mode: no session-type accent, so it gets its own on-state. */
-.seg {
-  composes: chip;
-
-  &.segOn {
-    background: var(--ink);
-    border-color: var(--ink);
-    color: var(--bg);
-    font-weight: 650;
-  }
-}
-
-.weekdays {
-  display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  gap: 4px;
+.weekdayGrid {
+  composes: weekdayGrid from '../../styles/shared.module.scss';
 }
 
 .weekday {
-  padding: 9px 0;
-  border-radius: 8px;
-  border: 1px solid var(--line);
-  background: var(--panel);
-  color: var(--mute);
-  font-size: 12.5px;
+  composes: weekday from '../../styles/shared.module.scss';
+}
 
-  &.weekdayOn {
-    background: var(--ink);
-    border-color: var(--ink);
-    color: var(--bg);
-    font-weight: 650;
-  }
+.weekdayOn {
+  composes: weekdayOn from '../../styles/shared.module.scss';
 }

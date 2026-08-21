@@ -22,12 +22,22 @@ async function parseOrThrow(res: Response, fallback: string): Promise<AuthResult
   if (res.ok) return (await res.json()) as AuthResult;
   if (res.status === 409) throw new AuthError('Diese E-Mail ist bereits registriert.');
   if (res.status === 401) throw new AuthError('E-Mail oder Passwort ist falsch.');
-  if (res.status === 400) throw new AuthError('Bitte E-Mail und Passwort (mind. 8 Zeichen) prüfen.');
+  if (res.status === 400) {
+    throw new AuthError('Bitte E-Mail und Passwort (mind. 8 Zeichen) prüfen.');
+  }
   throw new AuthError(fallback);
 }
 
-export async function register(email: string, password: string, displayName?: string): Promise<AuthResult> {
-  const res = await post('/auth/register', { email, password, displayName: displayName || undefined });
+export async function register(
+  email: string,
+  password: string,
+  displayName?: string,
+): Promise<AuthResult> {
+  const res = await post('/auth/register', {
+    email,
+    password,
+    displayName: displayName || undefined,
+  });
   return parseOrThrow(res, 'Registrierung fehlgeschlagen — Backend erreichbar?');
 }
 

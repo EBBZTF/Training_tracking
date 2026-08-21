@@ -1,4 +1,6 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+
+const VISIBLE_MS = 1700;
 
 export function useToast() {
   const [message, setMessage] = useState<string | null>(null);
@@ -7,8 +9,10 @@ export function useToast() {
   const show = useCallback((text: string) => {
     setMessage(text);
     window.clearTimeout(timer.current);
-    timer.current = window.setTimeout(() => setMessage(null), 1700);
+    timer.current = window.setTimeout(() => setMessage(null), VISIBLE_MS);
   }, []);
+
+  useEffect(() => () => window.clearTimeout(timer.current), []);
 
   return { message, show };
 }

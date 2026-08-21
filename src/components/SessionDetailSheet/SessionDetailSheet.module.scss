@@ -1,20 +1,17 @@
 .title {
-  composes: h2 from '../Sheet/Sheet.module.scss';
+  composes: sheetTitle from '../../styles/shared.module.scss';
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
 .dot {
+  composes: accentDot from '../../styles/shared.module.scss';
   display: inline-block;
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: var(--k, var(--faint));
 }
 
 .sub {
-  composes: sub from '../Sheet/Sheet.module.scss';
+  composes: sheetSub from '../../styles/shared.module.scss';
 }
 
 .notes {
@@ -28,35 +25,12 @@
 }
 
 .field {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+  composes: field from '../../styles/shared.module.scss';
   margin-bottom: 10px;
-
-  label {
-    font-size: 10px;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    color: var(--faint);
-  }
-
-  input,
-  select {
-    background: var(--panel2);
-    border: 1px solid var(--line);
-    border-radius: 8px;
-    padding: 9px 10px;
-    font-size: 15px;
-    width: 100%;
-  }
 }
 
 .ghost {
   composes: ghost from '../../styles/shared.module.scss';
-
-  &:disabled {
-    opacity: 0.5;
-  }
 }
 
 .row {
@@ -86,14 +60,8 @@
   margin-bottom: 10px;
 }
 
-.mini {
-  flex: 1;
-  font-size: 13px;
-  padding: 11px 8px;
-  border-radius: 8px;
-  border: 1px solid var(--line);
-  color: var(--mute);
-  text-align: center;
+.rowButton {
+  composes: rowButton from '../../styles/shared.module.scss';
 }
 
 .danger {

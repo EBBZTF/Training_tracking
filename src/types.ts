@@ -34,11 +34,6 @@ export interface Block {
   ex: Exercise[];
 }
 
-/** A block as rendered for a given day; a shared block is repeated on every day of the plan. */
-export interface BlockView extends Block {
-  shared?: boolean;
-}
-
 export interface Day {
   id: string;
   short: string;
@@ -49,15 +44,14 @@ export interface Day {
 
 export interface Plan {
   warmup: string[];
-  /** Optional block repeated on every day of the plan; absent unless the user has one. */
-  hip?: Block;
   days: Day[];
 }
 
 /** Values logged for one exercise, keyed by side; each array is indexed by set number. */
 export type SessionValues = Partial<Record<Side, string[]>>;
 
-export interface Session {
+/** One logged workout: what was entered on `date` against the plan `dayId`. */
+export interface WorkoutLog {
   date: string;
   dayId: string;
   vals: Record<string, SessionValues>;
@@ -66,11 +60,14 @@ export interface Session {
 
 export interface AppState {
   plan: Plan;
-  logs: Session[];
+  logs: WorkoutLog[];
 }
 
-/** Identifies one block within the plan: either the shared block, or the block at `index` on `dayId`. */
-export type BlockRef = { kind: 'hip' } | { kind: 'day'; dayId: string; index: number };
+/** Identifies one block within the plan: the block at `index` on `dayId`. */
+export interface BlockRef {
+  dayId: string;
+  index: number;
+}
 
 export type Mode = 'log' | 'edit';
 
@@ -81,7 +78,8 @@ export interface SessionType {
   label: string;
   color?: string;
   icon?: string;
-  custom: boolean; // true = user-created, false = seeded default (no delete/edit affordance for false)
+  /** True = user-created and deletable; false = seeded default, shared by every account. */
+  custom: boolean;
 }
 
 export interface PlannedSession {
@@ -96,7 +94,7 @@ export interface PlannedSession {
   ruleId?: number;
 }
 
-/** Weekday bit in a weekly rule's mask: Mo=1, Di=2, Mi=4, Do=8, Fr=16, Sa=32, So=64. */
+/** Weekday bits in a weekly rule's mask: Mo=1, Di=2, Mi=4, Do=8, Fr=16, Sa=32, So=64. */
 export type WeekdayMask = number;
 
 export type RecurrencePattern = 'weekly' | 'interval';
@@ -113,6 +111,9 @@ export interface RecurringRule {
   startDate: string;
   endDate?: string;
 }
+
+/** Everything needed to create a recurring rule; the id is assigned by the backend. */
+export type NewRecurringRule = Omit<RecurringRule, 'id'>;
 
 /** Which occurrences an edit to a series applies to. */
 export type EditScope = 'one' | 'future';

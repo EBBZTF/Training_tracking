@@ -48,14 +48,14 @@ export function PlainSession({
       <div className={styles.row}>
         <button
           type="button"
-          className={styles.mini}
+          className={styles.rowButton}
           onClick={() => onMarkStatus(session.status === 'done' ? 'planned' : 'done')}
         >
           {session.status === 'done' ? 'Nicht erledigt' : 'Erledigt markieren'}
         </button>
         <button
           type="button"
-          className={styles.mini}
+          className={styles.rowButton}
           onClick={() => onMarkStatus(session.status === 'skipped' ? 'planned' : 'skipped')}
         >
           {session.status === 'skipped' ? 'Nicht übersprungen' : 'Überspringen'}

@@ -1,11 +1,11 @@
 import { useRef } from 'react';
 import type { ChangeEvent } from 'react';
 import type { AppState } from '../../types';
+import { today } from '../../utils/date';
 import styles from './DataSheet.module.scss';
 
 interface DataSheetProps {
   state: AppState;
-  today: string;
   onImport: (data: AppState) => void;
   onReset: () => void;
   notify: (message: string) => void;
@@ -17,12 +17,12 @@ interface DataSheetProps {
 function isAppState(value: unknown): value is AppState {
   if (!value || typeof value !== 'object') return false;
   const v = value as Record<string, unknown>;
-  return !!v.plan && Array.isArray(v.logs);
+  const plan = v.plan as Record<string, unknown> | undefined;
+  return Boolean(plan) && Array.isArray(plan?.days) && Array.isArray(v.logs);
 }
 
 export function DataSheet({
   state,
-  today,
   onImport,
   onReset,
   notify,
@@ -36,7 +36,7 @@ export function DataSheet({
     const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = `training-${today}.json`;
+    a.download = `training-${today()}.json`;
     a.click();
     setTimeout(() => URL.revokeObjectURL(a.href), 1000);
     notify('Exportiert');
@@ -61,7 +61,12 @@ export function DataSheet({
   };
 
   const handleReset = () => {
-    if (window.confirm('Alle Pläne löschen? Protokollierte Einheiten bleiben erhalten.')) {
+    if (
+      window.confirm(
+        'Alle Pläne mit ihren Übungen löschen? Der Verlauf bleibt erhalten — die eingetragenen ' +
+          'Werte der gelöschten Übungen aber nicht.',
+      )
+    ) {
       onReset();
       notify('Pläne gelöscht');
     }
@@ -97,7 +102,7 @@ export function DataSheet({
         ref={fileRef}
         type="file"
         accept="application/json"
-        style={{ display: 'none' }}
+        className={styles.hiddenInput}
         onChange={handleFile}
       />
     </>

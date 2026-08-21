@@ -1,9 +1,9 @@
 .title {
-  composes: h2 from '../Sheet/Sheet.module.scss';
+  composes: sheetTitle from '../../styles/shared.module.scss';
 }
 
 .sub {
-  composes: sub from '../Sheet/Sheet.module.scss';
+  composes: sheetSub from '../../styles/shared.module.scss';
 }
 
 .solid {
@@ -27,7 +27,7 @@
   color: var(--mute);
 }
 
-.cuelabel {
+.cueLabel {
   display: block;
   font-size: 10px;
   letter-spacing: 0.14em;

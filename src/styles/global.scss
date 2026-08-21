@@ -1,14 +1,20 @@
 :root {
   --bg: #17171a;
+  /* --bg with alpha, for the sticky header/footer that blur what scrolls behind them. */
+  --bg-veil: #17171af5;
   --panel: #202026;
   --panel2: #26262e;
+  --panel3: #2c2c36;
   --line: #32323c;
+  --line-strong: #46465a;
   --ink: #edebe6;
   --mute: #8a8a94;
   --faint: #5a5a66;
+  --scrim: #0a0a0cb8;
   --huefte: #f2c14e;
   --skill: #5b9bc9;
   --kraft: #c6493e;
+  --kraft-line: #4a2a28;
   --explosiv: #4e9e6a;
   --core: #8a8a94;
   --ausdauer: #c08040;
@@ -49,6 +55,11 @@ button {
   border: none;
   padding: 0;
   cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.4;
+  cursor: default;
 }
 
 @media (prefers-reduced-motion: reduce) {

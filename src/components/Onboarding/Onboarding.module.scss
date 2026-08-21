@@ -112,10 +112,7 @@
 }
 
 .dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: var(--k, var(--faint));
+  composes: accentDot from '../../styles/shared.module.scss';
 }
 
 .cardTitle {
@@ -145,26 +142,17 @@
   }
 }
 
-.weekdays {
-  display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  gap: 4px;
+.weekdayGrid {
+  composes: weekdayGrid from '../../styles/shared.module.scss';
 }
 
 .weekday {
-  padding: 9px 0;
-  border-radius: 8px;
-  border: 1px solid var(--line);
+  composes: weekday from '../../styles/shared.module.scss';
   background: var(--panel2);
-  color: var(--mute);
-  font-size: 12.5px;
+}
 
-  &.weekdayOn {
-    background: var(--ink);
-    border-color: var(--ink);
-    color: var(--bg);
-    font-weight: 650;
-  }
+.weekdayOn {
+  composes: weekdayOn from '../../styles/shared.module.scss';
 }
 
 .inlineRow {
@@ -174,26 +162,9 @@
 }
 
 .inlineField {
+  composes: field from '../../styles/shared.module.scss';
   flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-
-  label {
-    font-size: 10px;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    color: var(--faint);
-  }
-
-  input {
-    background: var(--panel2);
-    border: 1px solid var(--line);
-    border-radius: 8px;
-    padding: 9px 10px;
-    font-size: 15px;
-    width: 100%;
-  }
+  margin-bottom: 0;
 }
 
 .summary {

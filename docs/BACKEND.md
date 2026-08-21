@@ -46,7 +46,7 @@ And add the frontend's origin to `CORS_ALLOWED_ORIGINS` on the backend. The loca
 
 The schema (`backend/src/main/resources/db/migration/V1__init_schema.sql`, applied via Flyway) mirrors the plan/log structure the app already used:
 
-- `days`, `blocks`, `exercises`, `warmup_items` — the training plan (blocks are either scoped to one day or shared across every day, like the hip block).
+- `days`, `blocks`, `exercises`, `warmup_items` — the training plan; every block belongs to exactly one day.
 - `sessions`, `session_warmup`, `session_values` — logged workouts: one `sessions` row per date+day, with checked-off warmup items and per-set logged values hanging off it.
 
 Every `PUT /api/state` call replaces the entire contents of these tables in one transaction (the app always saves the whole state at once, so there's no partial-update path to reconcile). Deleting an exercise from the plan also deletes its historical logged values, since they no longer have anything valid to reference.
